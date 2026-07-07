@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -21,7 +22,6 @@ import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.ShoppingCart
-import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +38,7 @@ import com.restaurant.offlinemanager.core.design.AppGreen
 import com.restaurant.offlinemanager.core.design.AppOrange
 import com.restaurant.offlinemanager.core.design.AppPurple
 import com.restaurant.offlinemanager.core.design.AppRed
+import com.restaurant.offlinemanager.core.design.AppLogoMark
 import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
@@ -187,7 +188,7 @@ fun HomeScreen(
 private fun GreetingCard() {
     GlassCard(modifier = Modifier.fillMaxWidth(), accent = Gold) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Icon(Icons.Outlined.VerifiedUser, contentDescription = null, tint = Gold)
+            AppLogoMark(modifier = Modifier.size(58.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text("سلام، خوش آمدید", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
                 Text("همه چیز تحت کنترل است", color = TextSecondary)

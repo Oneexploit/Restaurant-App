@@ -1,6 +1,7 @@
 package com.restaurant.offlinemanager.core.design
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -68,6 +69,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
+import com.restaurant.offlinemanager.R
 import com.restaurant.offlinemanager.core.navigation.BottomDestination
 import com.restaurant.offlinemanager.core.utils.MoneyFormatter
 import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
@@ -124,6 +127,8 @@ fun AppTopBar(
             .padding(horizontal = AppDimens.ScreenPadding, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        AppLogoMark(modifier = Modifier.size(46.dp))
+        Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
@@ -133,7 +138,7 @@ fun AppTopBar(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = "مدیریت غذای شرکتی",
+                text = "Restaurant Offline Manager",
                 color = TextSecondary,
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -147,6 +152,40 @@ fun AppTopBar(
         IconButton(onClick = onOpenSettings) {
             Icon(Icons.Outlined.Menu, contentDescription = "منو", tint = TextPrimary)
         }
+    }
+}
+
+@Composable
+fun AppLogoMark(
+    modifier: Modifier = Modifier,
+    showGlow: Boolean = true
+) {
+    val shape = RoundedCornerShape(18.dp)
+    Box(
+        modifier = modifier
+            .then(
+                if (showGlow) {
+                    Modifier.shadow(
+                        elevation = 14.dp,
+                        shape = shape,
+                        ambientColor = Gold.copy(alpha = 0.22f),
+                        spotColor = Gold.copy(alpha = 0.28f)
+                    )
+                } else {
+                    Modifier
+                }
+            )
+            .clip(shape)
+            .background(Brush.linearGradient(listOf(SurfaceGlass2, BackgroundStart)))
+            .border(1.dp, Gold.copy(alpha = 0.55f), shape)
+            .padding(5.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.ic_app_logo),
+            contentDescription = "لوگوی برنامه",
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
