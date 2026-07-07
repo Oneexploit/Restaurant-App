@@ -3,7 +3,6 @@ package com.restaurant.offlinemanager.ui.reports
 import android.content.Context
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,11 +33,11 @@ import com.restaurant.offlinemanager.core.design.AppRed
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
+import com.restaurant.offlinemanager.core.design.MoneyText
 import com.restaurant.offlinemanager.core.design.SectionHeader
 import com.restaurant.offlinemanager.core.design.StatCard
 import com.restaurant.offlinemanager.core.design.TextPrimary
 import com.restaurant.offlinemanager.core.design.TextSecondary
-import com.restaurant.offlinemanager.core.utils.MoneyFormatter
 import com.restaurant.offlinemanager.domain.model.MonthlyPoint
 import com.restaurant.offlinemanager.ui.AppUiState
 import com.restaurant.offlinemanager.ui.CsvReportType
@@ -59,31 +58,36 @@ fun ReportsScreen(
         item { SectionHeader("گزارش‌ها") }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard("گزارش خرید روزانه", MoneyFormatter.format(state.dashboard.todayPurchasesTotal), Icons.Outlined.ShoppingCart, AppGreen, Modifier.weight(1f))
-                StatCard("گزارش موجودی انبار", MoneyFormatter.format(state.dashboard.totalInventoryValue), Icons.Outlined.Inventory, AppCyan, Modifier.weight(1f))
+                StatCard("خرید امروز", com.restaurant.offlinemanager.core.utils.MoneyFormatter.format(state.dashboard.todayPurchasesTotal), Icons.Outlined.ShoppingCart, AppGreen, Modifier.weight(1f))
+                StatCard("ارزش انبار", com.restaurant.offlinemanager.core.utils.MoneyFormatter.format(state.dashboard.totalInventoryValue), Icons.Outlined.Inventory, AppCyan, Modifier.weight(1f))
             }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard("گزارش مطالبات", MoneyFormatter.format(state.dashboard.projectReceivablesTotal), Icons.Outlined.ReceiptLong, AppOrange, Modifier.weight(1f))
-                StatCard("گزارش بدهی‌ها", MoneyFormatter.format(state.dashboard.supplierDebtsTotal), Icons.Outlined.Payments, AppRed, Modifier.weight(1f))
+                StatCard("مطالبات", com.restaurant.offlinemanager.core.utils.MoneyFormatter.format(state.dashboard.projectReceivablesTotal), Icons.Outlined.ReceiptLong, AppOrange, Modifier.weight(1f))
+                StatCard("بدهی تامین‌کننده", com.restaurant.offlinemanager.core.utils.MoneyFormatter.format(state.dashboard.supplierDebtsTotal), Icons.Outlined.Payments, AppRed, Modifier.weight(1f))
             }
         }
         item {
-            GlassCard(Modifier.fillMaxWidth()) {
-                Text("خرید ماهانه", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+            GlassCard(Modifier.fillMaxWidth(), accent = AppPurple) {
+                Text("روند خرید ماهانه", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(10.dp))
                 MonthlyBars(state.monthlyPoints, valueSelector = { it.purchases }, color = AppPurple)
             }
         }
         item {
-            GlassCard(Modifier.fillMaxWidth()) {
+            GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
                 Text("درآمد در برابر هزینه", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(10.dp))
                 IncomeExpenseChart(state.monthlyPoints)
             }
         }
-        item { SectionHeader("خروجی CSV") }
+        item {
+            GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
+                Text("خلاصه خروجی‌ها", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+                Text("فایل‌های CSV در حافظه محلی برنامه ذخیره می‌شوند.", color = TextSecondary)
+            }
+        }
         item { GoldPrimaryButton("خروجی خریدها", onClick = { onExport(context, CsvReportType.PURCHASES) }, icon = Icons.Outlined.FileDownload) }
         item { GoldPrimaryButton("خروجی موجودی", onClick = { onExport(context, CsvReportType.INVENTORY) }, icon = Icons.Outlined.FileDownload) }
         item { GoldPrimaryButton("خروجی مطالبات", onClick = { onExport(context, CsvReportType.RECEIVABLES) }, icon = Icons.Outlined.FileDownload) }
