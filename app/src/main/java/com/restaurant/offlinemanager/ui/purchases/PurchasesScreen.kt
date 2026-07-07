@@ -25,9 +25,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.restaurant.offlinemanager.core.design.AppCyan
+import com.restaurant.offlinemanager.core.design.AppGreen
+import com.restaurant.offlinemanager.core.design.AppOrange
+import com.restaurant.offlinemanager.core.design.AppRed
 import com.restaurant.offlinemanager.core.design.AppSearchBar
 import com.restaurant.offlinemanager.core.design.DarkOutlinedTextField
 import com.restaurant.offlinemanager.core.design.EmptyState
@@ -36,7 +40,9 @@ import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
 import com.restaurant.offlinemanager.core.design.MoneyField
+import com.restaurant.offlinemanager.core.design.MoneyText
 import com.restaurant.offlinemanager.core.design.OptionSelector
+import com.restaurant.offlinemanager.core.design.PersianDateText
 import com.restaurant.offlinemanager.core.design.QuantityField
 import com.restaurant.offlinemanager.core.design.SectionHeader
 import com.restaurant.offlinemanager.core.design.StatusChip
@@ -75,6 +81,17 @@ fun PurchasesListScreen(
     ) {
         item { AppSearchBar(query, { query = it }, label = "جستجو در خریدها") }
         item { FilterChipRow(listOf("همه", "نقدی", "کارت", "نسیه"), filter, { filter = it }) }
+        item {
+            GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(Icons.Outlined.ShoppingCart, contentDescription = null, tint = AppCyan)
+                    Column(Modifier.weight(1f)) {
+                        Text("جمع خرید امروز", color = TextSecondary)
+                        MoneyText(state.dashboard.todayPurchasesTotal, style = MaterialTheme.typography.headlineMedium)
+                    }
+                }
+            }
+        }
         item { GoldPrimaryButton("ثبت فاکتور خرید", onClick = onAddPurchase, icon = Icons.Outlined.ShoppingCart) }
         if (purchases.isEmpty()) {
             item { EmptyState("خریدی پیدا نشد", "برای شروع یک فاکتور روزانه ثبت کنید.") }
@@ -82,18 +99,20 @@ fun PurchasesListScreen(
             items(purchases, key = { it.id }) { purchase ->
                 val supplier = state.snapshot.suppliers.firstOrNull { it.id == purchase.supplierId }
                 val warehouse = state.snapshot.warehouses.firstOrNull { it.id == purchase.warehouseId }
-                val itemCount = state.snapshot.purchaseItems.count { it.purchaseId == purchase.id }
-                GlassCard(Modifier.fillMaxWidth()) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Column(Modifier.weight(1f)) {
-                            Text(supplier?.name ?: "بدون تامین‌کننده", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
-                            Text("${PersianDateFormatter.format(purchase.date)} • ${warehouse?.name.orEmpty()}", color = TextSecondary)
-                            Text("شماره فاکتور: ${purchase.invoiceNumber ?: "-"}", color = TextMuted)
-                            Text("تعداد آیتم: ${NumberFormatter.format(itemCount)}", color = TextSecondary)
+                val purchaseItems = state.snapshot.purchaseItems.filter { it.purchaseId == purchase.id }
+                val firstMaterial = state.snapshot.materials.firstOrNull { material -> purchaseItems.firstOrNull()?.materialId == material.id }
+                GlassCard(Modifier.fillMaxWidth(), accent = if (purchase.paymentType == PurchasePaymentType.CREDIT) AppOrange else AppGreen) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(firstMaterial?.imageEmoji ?: "🧾", style = MaterialTheme.typography.headlineMedium)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(supplier?.name ?: "بدون تامین‌کننده", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                            Text(firstMaterial?.name ?: "چند قلم کالا", color = TextSecondary)
+                            Text("${warehouse?.name.orEmpty()} • ${NumberFormatter.format(purchaseItems.size)} آیتم", color = TextMuted)
+                            PersianDateText(purchase.date)
                         }
-                        Column {
-                            StatusChip(purchase.paymentType.label(), if (purchase.paymentType == PurchasePaymentType.CREDIT) com.restaurant.offlinemanager.core.design.AppOrange else com.restaurant.offlinemanager.core.design.AppGreen)
-                            Text(MoneyFormatter.format(purchase.totalAmount), color = Gold)
+                        Column(horizontalAlignment = Alignment.End) {
+                            StatusChip(purchase.paymentType.label(), if (purchase.paymentType == PurchasePaymentType.CREDIT) AppOrange else AppGreen)
+                            MoneyText(purchase.totalAmount, style = MaterialTheme.typography.titleMedium)
                         }
                     }
                 }
@@ -126,9 +145,7 @@ fun PurchaseFormScreen(
         val material = state.snapshot.materials.firstOrNull { it.id == row.materialId }
         val qty = NumberFormatter.normalizeDigits(row.quantity).toDoubleOrNull() ?: 0.0
         val price = MoneyFormatter.parse(row.unitPrice)
-        if (material != null && qty > 0 && price > 0) {
-            PurchaseItemInput(material.id, qty, material.mainUnit, price)
-        } else null
+        if (material != null && qty > 0 && price > 0) PurchaseItemInput(material.id, qty, material.mainUnit, price) else null
     }
     val total = (inputs.sumOf { it.totalAmount } - MoneyFormatter.parse(discount)).coerceAtLeast(0)
 
@@ -139,25 +156,32 @@ fun PurchaseFormScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { SectionHeader("ثبت فاکتور خرید") }
-        item { OptionSelector("تامین‌کننده", suppliers, supplier, { it.name }) { supplier = it } }
-        item { OptionSelector("انبار مقصد", warehouses, warehouse, { it.name }) { warehouse = it } }
         item {
-            FilterChipRow(
-                options = PurchasePaymentType.entries.map { it.label() },
-                selected = paymentType.label(),
-                onSelected = { label -> paymentType = PurchasePaymentType.entries.first { it.label() == label } }
-            )
-        }
-        if (paymentType == PurchasePaymentType.CARD) {
-            item { OptionSelector("کارت بانکی", cards, card, { it.title }) { card = it } }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                DarkOutlinedTextField(invoice, { invoice = it }, "شماره فاکتور", modifier = Modifier.weight(1f))
-                MoneyField(discount, { discount = it }, "تخفیف", modifier = Modifier.weight(1f))
+            GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
+                OptionSelector("تامین‌کننده", suppliers, supplier, { it.name }) { supplier = it }
+                Spacer(Modifier.height(10.dp))
+                OptionSelector("انبار مقصد", warehouses, warehouse, { it.name }) { warehouse = it }
+                Spacer(Modifier.height(10.dp))
+                FilterChipRow(
+                    options = PurchasePaymentType.entries.map { it.label() },
+                    selected = paymentType.label(),
+                    onSelected = { label -> paymentType = PurchasePaymentType.entries.first { it.label() == label } }
+                )
+                if (paymentType == PurchasePaymentType.CARD) {
+                    Spacer(Modifier.height(10.dp))
+                    OptionSelector("کارت بانکی", cards, card, { it.title }) { card = it }
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    DarkOutlinedTextField(invoice, { invoice = it }, "شماره فاکتور", modifier = Modifier.weight(1f))
+                    MoneyField(discount, { discount = it }, "تخفیف", modifier = Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(PersianDateFormatter.format(PersianDateFormatter.todayStartMillis()), {}, "تاریخ", readOnly = true)
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false)
             }
         }
-        item { DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false) }
         item { SectionHeader("آیتم‌های فاکتور") }
         items(rows, key = { it.localId }) { row ->
             PurchaseItemRow(
@@ -170,16 +194,14 @@ fun PurchaseFormScreen(
                 onRemove = { if (rows.size > 1) rows.remove(row) }
             )
         }
+        item { GoldPrimaryButton("افزودن آیتم", onClick = { rows.add(PurchaseRow()) }, icon = Icons.Outlined.Add) }
         item {
-            GoldPrimaryButton("افزودن آیتم", onClick = { rows.add(PurchaseRow()) }, icon = Icons.Outlined.Add)
-        }
-        item {
-            GlassCard(Modifier.fillMaxWidth()) {
+            GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
                 Text("مبلغ نهایی فاکتور", color = TextSecondary)
-                Text(MoneyFormatter.format(total), color = Gold, style = MaterialTheme.typography.headlineMedium)
+                MoneyText(total, style = MaterialTheme.typography.headlineMedium)
             }
         }
-        if (error != null) item { Text(error.orEmpty(), color = com.restaurant.offlinemanager.core.design.AppRed) }
+        if (error != null) item { Text(error.orEmpty(), color = AppRed) }
         item {
             GoldPrimaryButton(
                 text = "ثبت و ذخیره فاکتور",
@@ -222,8 +244,9 @@ private fun PurchaseItemRow(
     onRemove: () -> Unit
 ) {
     val selected = materials.firstOrNull { it.id == row.materialId }
-    GlassCard(Modifier.fillMaxWidth()) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+            Text(selected?.imageEmoji ?: "•", style = MaterialTheme.typography.headlineMedium)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OptionSelector("متریال", materials, selected, { it.name }) {
                     onChange(row.copy(materialId = it.id))
@@ -235,7 +258,7 @@ private fun PurchaseItemRow(
                 Text("واحد: ${selected?.mainUnit?.label() ?: "-"}", color = TextSecondary)
             }
             IconButton(onClick = onRemove) {
-                Icon(Icons.Outlined.Delete, contentDescription = "حذف", tint = com.restaurant.offlinemanager.core.design.AppRed)
+                Icon(Icons.Outlined.Delete, contentDescription = "حذف", tint = AppRed)
             }
         }
     }

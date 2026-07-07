@@ -1,5 +1,6 @@
 package com.restaurant.offlinemanager.ui.home
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.restaurant.offlinemanager.core.design.AppCyan
@@ -38,16 +41,20 @@ import com.restaurant.offlinemanager.core.design.AppRed
 import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
-import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
+import com.restaurant.offlinemanager.core.design.MoneyText
+import com.restaurant.offlinemanager.core.design.PersianDateText
 import com.restaurant.offlinemanager.core.design.SectionHeader
 import com.restaurant.offlinemanager.core.design.StatCard
 import com.restaurant.offlinemanager.core.design.StatusChip
+import com.restaurant.offlinemanager.core.design.TextMuted
 import com.restaurant.offlinemanager.core.design.TextPrimary
 import com.restaurant.offlinemanager.core.design.TextSecondary
 import com.restaurant.offlinemanager.core.utils.MoneyFormatter
 import com.restaurant.offlinemanager.core.utils.NumberFormatter
 import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
+import com.restaurant.offlinemanager.data.local.entity.ProjectStatus
 import com.restaurant.offlinemanager.domain.model.InventoryItem
+import com.restaurant.offlinemanager.domain.model.MealDeliveryInput
 import com.restaurant.offlinemanager.domain.model.label
 import com.restaurant.offlinemanager.ui.AppUiState
 
@@ -63,6 +70,15 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     val stats = state.dashboard
+    val today = PersianDateFormatter.todayStartMillis()
+    val activeProjects = state.projectFinances
+        .filter { it.project.status == ProjectStatus.ACTIVE }
+        .take(3)
+    val todayMeals = state.snapshot.mealDeliveries
+        .filter { it.date == today }
+        .take(3)
+    val lowStock = state.inventory.filter { it.isLowStock }.take(4)
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -70,27 +86,24 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            GlassCard(modifier = Modifier.fillMaxWidth()) {
-                Text("سلام، روز کاری خوبی داشته باشید", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
-                Text(PersianDateFormatter.formatLong(PersianDateFormatter.nowMillis()), color = TextSecondary)
-            }
+            GreetingCard()
         }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StatCard("پروژه‌های فعال", NumberFormatter.format(stats.activeProjectsCount), Icons.Outlined.BusinessCenter, Gold, Modifier.weight(1f))
-                    StatCard("وعده‌های امروز", NumberFormatter.format(stats.todayMealCount), Icons.Outlined.Restaurant, AppCyan, Modifier.weight(1f))
+                    StatCard("پروژه‌های فعال", NumberFormatter.format(stats.activeProjectsCount), Icons.Outlined.BusinessCenter, AppGreen, Modifier.weight(1f), "پروژه")
+                    StatCard("غذاهای امروز", NumberFormatter.format(stats.todayMealCount), Icons.Outlined.Restaurant, AppCyan, Modifier.weight(1f), "نفر")
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StatCard("خریدهای امروز", MoneyFormatter.format(stats.todayPurchasesTotal), Icons.Outlined.ShoppingCart, AppGreen, Modifier.weight(1f))
-                    StatCard("مطالبات پروژه‌ها", MoneyFormatter.format(stats.projectReceivablesTotal), Icons.Outlined.ReceiptLong, AppOrange, Modifier.weight(1f))
+                    StatCard("هشدارهای انبار", NumberFormatter.format(stats.lowStockItemCount), Icons.Outlined.Warning, AppOrange, Modifier.weight(1f), "قلم کالا")
+                    StatCard("مطالبات پروژه‌ها", MoneyFormatter.format(stats.projectReceivablesTotal), Icons.Outlined.ReceiptLong, AppPurple, Modifier.weight(1f))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     StatCard("بدهی تامین‌کنندگان", MoneyFormatter.format(stats.supplierDebtsTotal), Icons.Outlined.Payments, AppRed, Modifier.weight(1f))
-                    StatCard("هشدارهای انبار", NumberFormatter.format(stats.lowStockItemCount), Icons.Outlined.Warning, AppPurple, Modifier.weight(1f))
+                    StatCard("خریدهای امروز", MoneyFormatter.format(stats.todayPurchasesTotal), Icons.Outlined.ShoppingCart, AppCyan, Modifier.weight(1f))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StatCard("موجودی کارت‌ها", MoneyFormatter.format(stats.bankCardsTotalBalance), Icons.Outlined.AccountBalanceWallet, AppCyan, Modifier.weight(1f))
+                    StatCard("موجودی کارت‌ها", MoneyFormatter.format(stats.bankCardsTotalBalance), Icons.Outlined.AccountBalanceWallet, Gold, Modifier.weight(1f))
                     StatCard("ارزش انبار", MoneyFormatter.format(stats.totalInventoryValue), Icons.Outlined.Inventory, AppGreen, Modifier.weight(1f))
                 }
             }
@@ -101,23 +114,62 @@ fun HomeScreen(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    QuickAction("افزودن پروژه", Icons.Outlined.Add, onAddProject, Modifier.weight(1f))
-                    QuickAction("ثبت وعده", Icons.Outlined.Restaurant, onAddMeal, Modifier.weight(1f))
+                    QuickActionCard("افزودن پروژه", Icons.Outlined.Add, Gold, onAddProject, Modifier.weight(1f))
+                    QuickActionCard("ثبت وعده", Icons.Outlined.Restaurant, AppCyan, onAddMeal, Modifier.weight(1f))
+                    QuickActionCard("ورود کالا", Icons.Outlined.Inventory, AppGreen, onStockIn, Modifier.weight(1f))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    QuickAction("ورود کالا", Icons.Outlined.Inventory, onStockIn, Modifier.weight(1f))
-                    QuickAction("خرید روزانه", Icons.Outlined.ShoppingCart, onAddPurchase, Modifier.weight(1f))
+                    QuickActionCard("خرید روزانه", Icons.Outlined.ShoppingCart, AppCyan, onAddPurchase, Modifier.weight(1f))
+                    QuickActionCard("دریافت پروژه", Icons.Outlined.Payments, AppPurple, onAddPayment, Modifier.weight(1f))
+                    QuickActionCard("گزارش‌ها", Icons.Outlined.BarChart, AppOrange, onReports, Modifier.weight(1f))
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    QuickAction("دریافت از پروژه", Icons.Outlined.Payments, onAddPayment, Modifier.weight(1f))
-                    QuickAction("گزارش‌ها", Icons.Outlined.BarChart, onReports, Modifier.weight(1f))
+            }
+        }
+        item {
+            SectionHeader("پروژه‌های فعال")
+        }
+        if (activeProjects.isEmpty()) {
+            item { EmptyState("پروژه فعالی ثبت نشده", "از دکمه افزودن پروژه، اولین پروژه را ثبت کنید.") }
+        } else {
+            items(activeProjects, key = { it.project.id }) { finance ->
+                GlassCard(modifier = Modifier.fillMaxWidth(), accent = AppGreen) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(finance.project.name, color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                            Text(finance.project.address.orEmpty(), color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+                            Text("نفرات: ${NumberFormatter.format(finance.project.workerCount)}", color = TextSecondary)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            StatusChip(finance.project.status.label(), AppGreen)
+                            MoneyText(finance.receivable.coerceAtLeast(0), style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            SectionHeader("وعده‌های امروز")
+        }
+        if (todayMeals.isEmpty()) {
+            item { EmptyState("وعده‌ای برای امروز ثبت نشده", "ثبت وعده امروز، آمار داشبورد را به‌روز می‌کند.") }
+        } else {
+            items(todayMeals, key = { it.id }) { meal ->
+                val project = state.snapshot.projects.firstOrNull { it.id == meal.projectId }
+                GlassCard(modifier = Modifier.fillMaxWidth(), accent = AppCyan) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Restaurant, contentDescription = null, tint = AppCyan)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(project?.name ?: "پروژه", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                            Text("${meal.mealType.label()} • ${NumberFormatter.format(meal.quantity)} نفر", color = TextSecondary)
+                        }
+                        MoneyText(meal.totalAmount, style = MaterialTheme.typography.titleMedium)
+                    }
                 }
             }
         }
         item {
             SectionHeader("کمبود موجودی")
         }
-        val lowStock = state.inventory.filter { it.isLowStock }.take(5)
         if (lowStock.isEmpty()) {
             item {
                 EmptyState("همه چیز مرتب است", "هیچ کالایی زیر حداقل موجودی نیست.")
@@ -132,34 +184,52 @@ fun HomeScreen(
 }
 
 @Composable
-private fun QuickAction(
+private fun GreetingCard() {
+    GlassCard(modifier = Modifier.fillMaxWidth(), accent = Gold) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Icon(Icons.Outlined.VerifiedUser, contentDescription = null, tint = Gold)
+            Column(modifier = Modifier.weight(1f)) {
+                Text("سلام، خوش آمدید", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+                Text("همه چیز تحت کنترل است", color = TextSecondary)
+                PersianDateText(PersianDateFormatter.nowMillis(), long = true)
+            }
+            StatusChip("آفلاین", Gold)
+        }
+    }
+}
+
+@Composable
+private fun QuickActionCard(
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
+    color: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    GoldPrimaryButton(
-        text = label,
-        icon = icon,
-        onClick = onClick,
+    GlassCard(
         modifier = modifier
-    )
+            .height(86.dp)
+            .clickable(onClick = onClick),
+        accent = color,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)
+    ) {
+        Icon(icon, contentDescription = null, tint = color)
+        Spacer(Modifier.height(8.dp))
+        Text(label, color = TextPrimary, style = MaterialTheme.typography.labelLarge)
+    }
 }
 
 @Composable
 private fun LowStockRow(item: InventoryItem) {
-    GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(item.emoji ?: "•", style = MaterialTheme.typography.titleLarge)
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 12.dp)
-            ) {
+    GlassCard(modifier = Modifier.fillMaxWidth(), accent = AppOrange) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(item.emoji ?: "•", style = MaterialTheme.typography.headlineMedium)
+            Column(modifier = Modifier.weight(1f)) {
                 Text(item.materialName, color = TextPrimary, fontWeight = FontWeight.Bold)
-                Text("${item.warehouseName} • ${NumberFormatter.format(item.quantity)} ${item.unit.label()}", color = TextSecondary)
+                Text("${item.warehouseName} • موجودی ${NumberFormatter.format(item.quantity)} ${item.unit.label()}", color = TextSecondary)
+                Text("حداقل: ${NumberFormatter.format(item.minimumStock)} ${item.unit.label()}", color = TextMuted)
             }
-            StatusChip("کمبود موجودی", AppOrange)
+            StatusChip("کمبود", AppOrange)
         }
     }
 }

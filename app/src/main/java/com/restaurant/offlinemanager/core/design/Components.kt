@@ -2,6 +2,7 @@ package com.restaurant.offlinemanager.core.design
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -65,6 +67,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.restaurant.offlinemanager.core.navigation.BottomDestination
+import com.restaurant.offlinemanager.core.utils.MoneyFormatter
+import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
 
 @Composable
 fun AppScaffold(
@@ -115,14 +119,14 @@ fun AppTopBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = AppDimens.ScreenPadding, vertical = 14.dp),
+            .padding(horizontal = AppDimens.ScreenPadding, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
                 color = TextPrimary,
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.titleLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -148,22 +152,39 @@ fun AppTopBar(
 fun GlassCard(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
+    accent: Color? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val shape = RoundedCornerShape(AppDimens.CardRadius)
     Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(AppDimens.CardRadius),
-        colors = CardDefaults.cardColors(containerColor = SurfaceGlass),
-        border = BorderStroke(1.dp, Border.copy(alpha = 0.75f)),
+        modifier = modifier.shadow(
+            elevation = 18.dp,
+            shape = shape,
+            ambientColor = Color.Black.copy(alpha = 0.36f),
+            spotColor = (accent ?: Gold).copy(alpha = 0.12f)
+        ),
+        shape = shape,
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        border = BorderStroke(1.dp, (accent ?: Border).copy(alpha = if (accent == null) 0.72f else 0.55f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier
                 .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            SurfaceGlass.copy(alpha = 0.96f),
+                            SurfaceGlass2.copy(alpha = 0.82f),
+                            BackgroundStart.copy(alpha = 0.35f)
+                        )
+                    )
+                )
+                .background(
                     Brush.linearGradient(
                         listOf(
-                            Color.White.copy(alpha = 0.035f),
-                            Color.White.copy(alpha = 0.005f)
+                            (accent ?: Color.White).copy(alpha = if (accent == null) 0.035f else 0.13f),
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.015f)
                         )
                     )
                 )
@@ -182,24 +203,27 @@ fun StatCard(
     modifier: Modifier = Modifier,
     subtitle: String? = null
 ) {
-    GlassCard(modifier = modifier.heightIn(min = 118.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    GlassCard(modifier = modifier.heightIn(min = 112.dp), accent = accent.copy(alpha = 0.9f)) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(40.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(accent.copy(alpha = 0.16f)),
+                    .background(
+                        Brush.linearGradient(
+                            listOf(accent.copy(alpha = 0.28f), accent.copy(alpha = 0.08f))
+                        )
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(icon, contentDescription = null, tint = accent)
             }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+            Column {
+                Text(title, color = TextSecondary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     value,
                     color = TextPrimary,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.headlineMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -219,23 +243,26 @@ fun GoldPrimaryButton(
     icon: ImageVector = Icons.Outlined.Add,
     enabled: Boolean = true
 ) {
-    Button(
-        onClick = onClick,
+    val shape = RoundedCornerShape(18.dp)
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(AppDimens.ButtonHeight),
-        enabled = enabled,
-        shape = RoundedCornerShape(18.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Gold,
-            contentColor = BackgroundStart,
-            disabledContainerColor = Border,
-            disabledContentColor = TextMuted
-        )
+            .height(AppDimens.ButtonHeight)
+            .shadow(14.dp, shape, ambientColor = Gold.copy(alpha = 0.18f), spotColor = Gold.copy(alpha = 0.18f))
+            .clip(shape)
+            .background(
+                if (enabled) Brush.verticalGradient(listOf(GoldLight, Gold))
+                else Brush.verticalGradient(listOf(Border, SurfaceGlass2))
+            )
+            .border(1.dp, Color.White.copy(alpha = if (enabled) 0.18f else 0.06f), shape)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = null)
-        Spacer(Modifier.width(8.dp))
-        Text(text, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = if (enabled) BackgroundStart else TextMuted)
+            Spacer(Modifier.width(8.dp))
+            Text(text, fontWeight = FontWeight.Bold, color = if (enabled) BackgroundStart else TextMuted)
+        }
     }
 }
 
@@ -272,7 +299,9 @@ fun DarkOutlinedTextField(
             focusedContainerColor = SurfaceGlass2,
             unfocusedContainerColor = SurfaceGlass2,
             disabledContainerColor = SurfaceGlass2,
-            errorContainerColor = SurfaceGlass2
+            errorContainerColor = SurfaceGlass2,
+            focusedTrailingIconColor = Gold,
+            unfocusedTrailingIconColor = TextMuted
         )
     )
 }
@@ -286,8 +315,11 @@ fun AppBottomNavigation(
     NavigationBar(
         modifier = Modifier
             .padding(horizontal = 12.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(24.dp)),
-        containerColor = SurfaceGlass,
+            .shadow(18.dp, RoundedCornerShape(24.dp), ambientColor = Color.Black.copy(alpha = 0.45f), spotColor = Gold.copy(alpha = 0.1f))
+            .clip(RoundedCornerShape(24.dp))
+            .background(SurfaceGlass.copy(alpha = 0.92f))
+            .border(1.dp, Border.copy(alpha = 0.72f), RoundedCornerShape(24.dp)),
+        containerColor = Color.Transparent,
         tonalElevation = 0.dp
     ) {
         destinations.forEach { destination ->
@@ -306,7 +338,7 @@ fun AppBottomNavigation(
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = Gold,
                     selectedTextColor = Gold,
-                    indicatorColor = Gold.copy(alpha = 0.14f),
+                    indicatorColor = Gold.copy(alpha = 0.18f),
                     unselectedIconColor = TextMuted,
                     unselectedTextColor = TextMuted
                 )
@@ -330,6 +362,38 @@ fun StatusChip(
             labelColor = color
         ),
         border = BorderStroke(1.dp, color.copy(alpha = 0.35f))
+    )
+}
+
+@Composable
+fun MoneyText(
+    amount: Long,
+    modifier: Modifier = Modifier,
+    color: Color = Gold,
+    style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.titleLarge
+) {
+    Text(
+        text = MoneyFormatter.format(amount),
+        modifier = modifier,
+        color = color,
+        style = style,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
+}
+
+@Composable
+fun PersianDateText(
+    timestamp: Long,
+    modifier: Modifier = Modifier,
+    long: Boolean = false,
+    color: Color = TextSecondary
+) {
+    Text(
+        text = if (long) PersianDateFormatter.formatLong(timestamp) else PersianDateFormatter.format(timestamp),
+        modifier = modifier,
+        color = color,
+        style = MaterialTheme.typography.bodyMedium
     )
 }
 
@@ -444,14 +508,24 @@ fun AppSearchBar(
     modifier: Modifier = Modifier,
     label: String = "جستجو"
 ) {
-    DarkOutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = label,
-        modifier = modifier,
-        trailingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, tint = TextMuted) }
-    )
+    GlassCard(modifier = modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
+        DarkOutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = label,
+            modifier = Modifier,
+            trailingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, tint = TextMuted) }
+        )
+    }
 }
+
+@Composable
+fun SearchBar(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    label: String = "جستجو"
+) = AppSearchBar(value = value, onValueChange = onValueChange, modifier = modifier, label = label)
 
 @Composable
 fun FilterChipRow(

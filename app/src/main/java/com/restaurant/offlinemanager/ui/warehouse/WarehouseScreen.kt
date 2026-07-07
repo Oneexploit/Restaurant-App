@@ -14,9 +14,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Inventory
 import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ScrollableTabRow
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -39,9 +40,12 @@ import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
 import com.restaurant.offlinemanager.core.design.MoneyField
+import com.restaurant.offlinemanager.core.design.MoneyText
 import com.restaurant.offlinemanager.core.design.OptionSelector
+import com.restaurant.offlinemanager.core.design.PersianDateText
 import com.restaurant.offlinemanager.core.design.QuantityField
 import com.restaurant.offlinemanager.core.design.SectionHeader
+import com.restaurant.offlinemanager.core.design.StatCard
 import com.restaurant.offlinemanager.core.design.StatusChip
 import com.restaurant.offlinemanager.core.design.TextMuted
 import com.restaurant.offlinemanager.core.design.TextPrimary
@@ -77,16 +81,7 @@ fun WarehouseMainScreen(
             .fillMaxSize()
             .padding(horizontal = 18.dp)
     ) {
-        ScrollableTabRow(
-            selectedTabIndex = tab,
-            containerColor = com.restaurant.offlinemanager.core.design.SurfaceGlass,
-            contentColor = Gold,
-            edgePadding = 0.dp
-        ) {
-            tabs.forEachIndexed { index, title ->
-                Tab(selected = tab == index, onClick = { tab = index }, text = { Text(title) })
-            }
-        }
+        FilterChipRow(tabs, tabs[tab], { tab = tabs.indexOf(it) })
         Spacer(Modifier.height(12.dp))
         when (tab) {
             0 -> InventoryTab(state, onStockIn, onStockOut, onTransfer)
@@ -105,9 +100,40 @@ private fun InventoryTab(
     onTransfer: () -> Unit
 ) {
     var query by remember { mutableStateOf("") }
-    val items = state.inventory.filter { query.isBlank() || it.materialName.contains(query) || it.warehouseName.contains(query) }
+    var selectedWarehouse by remember { mutableStateOf(state.snapshot.warehouses.firstOrNull()?.name ?: "همه") }
+    val warehouseOptions = listOf("همه") + state.snapshot.warehouses.map { it.name }
+    val items = state.inventory.filter {
+        (selectedWarehouse == "همه" || it.warehouseName == selectedWarehouse) &&
+            (query.isBlank() || it.materialName.contains(query) || it.warehouseName.contains(query))
+    }
+    val lowStock = items.filter { it.isLowStock }
+    val today = PersianDateFormatter.todayStartMillis()
+    val todayTransactions = state.snapshot.stockTransactions.filter { it.date == today }
+    val todayIn = todayTransactions.filter { it.type == StockTransactionType.IN || it.type == StockTransactionType.TRANSFER_IN }.sumOf { it.quantity }
+    val todayOut = todayTransactions.filter { it.type == StockTransactionType.OUT || it.type == StockTransactionType.TRANSFER_OUT || it.type == StockTransactionType.WASTE }.sumOf { it.quantity }
+
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { AppSearchBar(query, { query = it }, label = "جستجو در موجودی") }
+        item { FilterChipRow(warehouseOptions.take(4), selectedWarehouse, { selectedWarehouse = it }) }
+        if (lowStock.isNotEmpty()) {
+            item {
+                GlassCard(Modifier.fillMaxWidth(), accent = AppOrange) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Icon(Icons.Outlined.Warning, contentDescription = null, tint = AppOrange)
+                        Column(Modifier.weight(1f)) {
+                            Text("اقلام کالا با موجودی کم", color = AppOrange, style = MaterialTheme.typography.titleMedium)
+                            Text("${NumberFormatter.format(lowStock.size)} قلم زیر حداقل موجودی قرار دارد", color = TextSecondary)
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatCard("ورود امروز", "${NumberFormatter.format(todayIn)}", Icons.Outlined.Inventory, Gold, Modifier.weight(1f), "واحد")
+                StatCard("خروج امروز", "${NumberFormatter.format(todayOut)}", Icons.Outlined.Inventory, AppRed, Modifier.weight(1f), "واحد")
+            }
+        }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GoldPrimaryButton("ورود کالا", onClick = onStockIn, icon = Icons.Outlined.Add, modifier = Modifier.weight(1f))
@@ -128,16 +154,19 @@ private fun InventoryTab(
 
 @Composable
 private fun InventoryCard(item: InventoryItem) {
-    GlassCard(Modifier.fillMaxWidth()) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    GlassCard(Modifier.fillMaxWidth(), accent = if (item.isLowStock) AppOrange else AppCyan) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(item.emoji ?: "•", style = MaterialTheme.typography.headlineMedium)
-            Column(Modifier.weight(1f)) {
-                Text(item.materialName, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(item.materialName, color = TextPrimary, style = MaterialTheme.typography.titleMedium)
                 Text(item.warehouseName, color = TextSecondary)
-                Text("${NumberFormatter.format(item.quantity)} ${item.unit.label()}", color = TextPrimary)
-                Text("ارزش تقریبی: ${MoneyFormatter.format(item.approximateValue)}", color = TextMuted)
+                Text("موجودی: ${NumberFormatter.format(item.quantity)} ${item.unit.label()}", color = TextPrimary)
+                Text("حداقل: ${NumberFormatter.format(item.minimumStock)} ${item.unit.label()}", color = if (item.isLowStock) AppOrange else TextMuted)
             }
-            StatusChip(if (item.isLowStock) "کمبود" else "عادی", if (item.isLowStock) AppOrange else AppGreen)
+            Column(horizontalAlignment = Alignment.End) {
+                StatusChip(if (item.isLowStock) "کمبود" else "عادی", if (item.isLowStock) AppOrange else AppGreen)
+                MoneyText(item.approximateValue, style = MaterialTheme.typography.titleMedium)
+            }
         }
     }
 }
@@ -148,11 +177,19 @@ private fun WarehousesTab(state: AppUiState, onAddWarehouse: () -> Unit) {
         item { GoldPrimaryButton("افزودن انبار", onClick = onAddWarehouse, icon = Icons.Outlined.Add) }
         items(state.snapshot.warehouses, key = { it.id }) { warehouse ->
             val inventory = state.inventory.filter { it.warehouseId == warehouse.id }
-            GlassCard(Modifier.fillMaxWidth()) {
-                Text(warehouse.name, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
-                Text(warehouse.type.label(), color = TextSecondary)
-                Text("تعداد کالا: ${NumberFormatter.format(inventory.count())}", color = TextSecondary)
-                Text("ارزش موجودی: ${MoneyFormatter.format(inventory.sumOf { it.approximateValue })}", color = Gold)
+            GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Inventory, contentDescription = null, tint = Gold)
+                    Column(Modifier.weight(1f)) {
+                        Text(warehouse.name, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+                        Text(warehouse.type.label(), color = TextSecondary)
+                        Text(warehouse.address.orEmpty(), color = TextMuted)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("${NumberFormatter.format(inventory.count())} قلم", color = TextSecondary)
+                        MoneyText(inventory.sumOf { it.approximateValue }, style = MaterialTheme.typography.titleMedium)
+                    }
+                }
             }
         }
     }
@@ -164,14 +201,19 @@ private fun TransactionsTab(state: AppUiState) {
         items(state.snapshot.stockTransactions.take(60), key = { it.id }) { tx ->
             val warehouse = state.snapshot.warehouses.firstOrNull { it.id == tx.warehouseId }
             val material = state.snapshot.materials.firstOrNull { it.id == tx.materialId }
-            GlassCard(Modifier.fillMaxWidth()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            val positive = tx.type == StockTransactionType.IN || tx.type == StockTransactionType.TRANSFER_IN
+            GlassCard(Modifier.fillMaxWidth(), accent = if (positive) AppGreen else AppOrange) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Inventory, contentDescription = null, tint = if (positive) AppGreen else AppOrange)
                     Column(Modifier.weight(1f)) {
-                        Text(material?.name ?: "کالای حذف‌شده", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
-                        Text("${warehouse?.name.orEmpty()} • ${PersianDateFormatter.format(tx.date)}", color = TextSecondary)
-                        Text("${NumberFormatter.format(tx.quantity)} ${tx.unit.label()}", color = TextSecondary)
+                        Text(material?.name ?: "کالای حذف‌شده", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                        Text("${warehouse?.name.orEmpty()} • ${tx.type.label()}", color = TextSecondary)
+                        PersianDateText(tx.date)
                     }
-                    StatusChip(tx.type.label(), if (tx.type == StockTransactionType.IN || tx.type == StockTransactionType.TRANSFER_IN) AppGreen else AppOrange)
+                    Column(horizontalAlignment = Alignment.End) {
+                        StatusChip(tx.reason.label(), if (positive) AppGreen else AppOrange)
+                        Text("${NumberFormatter.format(tx.quantity)} ${tx.unit.label()}", color = TextPrimary)
+                    }
                 }
             }
         }
@@ -184,11 +226,17 @@ private fun MaterialsTab(state: AppUiState, onAddMaterial: () -> Unit) {
         item { GoldPrimaryButton("افزودن متریال", onClick = onAddMaterial, icon = Icons.Outlined.Add) }
         items(state.snapshot.materials, key = { it.id }) { material ->
             val category = state.snapshot.materialCategories.firstOrNull { it.id == material.categoryId }
-            GlassCard(Modifier.fillMaxWidth()) {
-                Text("${material.imageEmoji ?: "•"} ${material.name}", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
-                Text("واحد اصلی: ${material.mainUnit.label()}", color = TextSecondary)
-                Text("حداقل موجودی: ${NumberFormatter.format(material.minimumStock)}", color = TextSecondary)
-                Text("دسته‌بندی: ${category?.name ?: "بدون دسته"}", color = TextMuted)
+            GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(material.imageEmoji ?: "•", style = MaterialTheme.typography.headlineMedium)
+                    Column(Modifier.weight(1f)) {
+                        Text(material.name, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+                        Text("واحد اصلی: ${material.mainUnit.label()}", color = TextSecondary)
+                        Text("حداقل موجودی: ${NumberFormatter.format(material.minimumStock)}", color = TextSecondary)
+                        Text("دسته‌بندی: ${category?.name ?: "بدون دسته"}", color = TextMuted)
+                    }
+                    StatusChip(if (material.isActive) "فعال" else "غیرفعال", if (material.isActive) AppGreen else TextMuted)
+                }
             }
         }
     }
@@ -218,22 +266,30 @@ fun StockTransactionFormScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { SectionHeader(mode.label()) }
-        item { OptionSelector(if (mode == StockTransactionType.TRANSFER_OUT) "انبار مبدا" else "انبار", warehouses, fromWarehouse, { it.name }) { fromWarehouse = it } }
-        if (mode == StockTransactionType.TRANSFER_OUT) {
-            item { OptionSelector("انبار مقصد", warehouses, toWarehouse, { it.name }) { toWarehouse = it } }
-        }
-        item { OptionSelector("متریال", materials, material, { it.name }) { material = it } }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                QuantityField(quantity, { quantity = it }, "مقدار", Modifier.weight(1f))
-                MoneyField(unitPrice, { unitPrice = it }, "قیمت واحد", Modifier.weight(1f))
+            GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
+                OptionSelector(if (mode == StockTransactionType.TRANSFER_OUT) "انبار مبدا" else "انبار", warehouses, fromWarehouse, { it.name }) { fromWarehouse = it }
+                if (mode == StockTransactionType.TRANSFER_OUT) {
+                    Spacer(Modifier.height(10.dp))
+                    OptionSelector("انبار مقصد", warehouses, toWarehouse, { it.name }) { toWarehouse = it }
+                }
+                Spacer(Modifier.height(10.dp))
+                OptionSelector("متریال", materials, material, { it.name }) { material = it }
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    QuantityField(quantity, { quantity = it }, "مقدار", Modifier.weight(1f))
+                    MoneyField(unitPrice, { unitPrice = it }, "قیمت واحد", Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(PersianDateFormatter.format(PersianDateFormatter.todayStartMillis()), {}, "تاریخ ورود", readOnly = true)
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(notes, { notes = it }, "یادداشت", singleLine = false)
             }
         }
-        item { DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false) }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }
         item {
             GoldPrimaryButton(
-                text = "ثبت",
+                text = "ثبت تراکنش",
                 icon = Icons.Outlined.Save,
                 onClick = {
                     val qty = NumberFormatter.normalizeDigits(quantity).toDoubleOrNull() ?: 0.0
@@ -264,15 +320,7 @@ fun StockTransactionFormScreen(
                             notes = notes
                         )
                         if (mode == StockTransactionType.TRANSFER_OUT && toWarehouse != null) {
-                            onSave(
-                                listOf(
-                                    input,
-                                    input.copy(
-                                        warehouseId = toWarehouse!!.id,
-                                        type = StockTransactionType.TRANSFER_IN
-                                    )
-                                )
-                            )
+                            onSave(listOf(input, input.copy(warehouseId = toWarehouse!!.id, type = StockTransactionType.TRANSFER_IN)))
                         } else {
                             onSave(listOf(input))
                         }
@@ -302,10 +350,17 @@ fun WarehouseFormScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { SectionHeader("افزودن انبار") }
-        item { DarkOutlinedTextField(name, { name = it }, "نام انبار") }
-        item { OptionSelector("نوع انبار", WarehouseType.entries, type, { it.label() }) { type = it } }
-        item { DarkOutlinedTextField(address, { address = it }, "آدرس", singleLine = false) }
-        item { DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false) }
+        item {
+            GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
+                DarkOutlinedTextField(name, { name = it }, "نام انبار")
+                Spacer(Modifier.height(10.dp))
+                OptionSelector("نوع انبار", WarehouseType.entries, type, { it.label() }) { type = it }
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(address, { address = it }, "آدرس", singleLine = false)
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false)
+            }
+        }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }
         item {
             GoldPrimaryButton("ذخیره", onClick = {
@@ -336,14 +391,27 @@ fun MaterialFormScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { SectionHeader("افزودن متریال") }
-        item { DarkOutlinedTextField(name, { name = it }, "نام متریال") }
-        item { OptionSelector("دسته‌بندی", state.snapshot.materialCategories, category, { it.name }) { category = it } }
-        item { OptionSelector("واحد اصلی", UnitType.entries, unit, { it.label() }) { unit = it } }
-        item { DarkOutlinedTextField(minStock, { minStock = it }, "حداقل موجودی", keyboardType = KeyboardType.Decimal) }
-        item { DarkOutlinedTextField(emoji, { emoji = it }, "آیکن/ایموجی") }
+        item {
+            GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
+                OptionSelector("انتخاب انبار", state.snapshot.warehouses, state.snapshot.warehouses.firstOrNull(), { it.name }) {}
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(name, { name = it }, "نام متریال")
+                Spacer(Modifier.height(10.dp))
+                OptionSelector("دسته‌بندی", state.snapshot.materialCategories, category, { it.name }) { category = it }
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OptionSelector("واحد", UnitType.entries, unit, { it.label() }, modifier = Modifier.weight(1f)) { unit = it }
+                    DarkOutlinedTextField(minStock, { minStock = it }, "تعداد/حداقل", keyboardType = KeyboardType.Decimal, modifier = Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(emoji, { emoji = it }, "آیکن/ایموجی")
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(PersianDateFormatter.format(PersianDateFormatter.todayStartMillis()), {}, "تاریخ ثبت", readOnly = true)
+            }
+        }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }
         item {
-            GoldPrimaryButton("ذخیره", onClick = {
+            GoldPrimaryButton("ثبت متریال", onClick = {
                 val minimum = NumberFormatter.normalizeDigits(minStock).toDoubleOrNull() ?: 0.0
                 error = if (name.isBlank()) "نام متریال الزامی است" else null
                 if (error == null) {

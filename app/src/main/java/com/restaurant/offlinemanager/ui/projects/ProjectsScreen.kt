@@ -1,6 +1,8 @@
 package com.restaurant.offlinemanager.ui.projects
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,14 +10,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -24,13 +32,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.restaurant.offlinemanager.core.design.AppCyan
 import com.restaurant.offlinemanager.core.design.AppGreen
 import com.restaurant.offlinemanager.core.design.AppOrange
+import com.restaurant.offlinemanager.core.design.AppPurple
 import com.restaurant.offlinemanager.core.design.AppRed
 import com.restaurant.offlinemanager.core.design.AppSearchBar
 import com.restaurant.offlinemanager.core.design.ConfirmDialog
@@ -39,8 +51,10 @@ import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.FilterChipRow
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
+import com.restaurant.offlinemanager.core.design.GoldLight
 import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
 import com.restaurant.offlinemanager.core.design.MoneyField
+import com.restaurant.offlinemanager.core.design.MoneyText
 import com.restaurant.offlinemanager.core.design.OptionSelector
 import com.restaurant.offlinemanager.core.design.SectionHeader
 import com.restaurant.offlinemanager.core.design.StatusChip
@@ -50,7 +64,6 @@ import com.restaurant.offlinemanager.core.design.TextSecondary
 import com.restaurant.offlinemanager.core.utils.MoneyFormatter
 import com.restaurant.offlinemanager.core.utils.NumberFormatter
 import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
-import com.restaurant.offlinemanager.data.local.entity.ProjectEntity
 import com.restaurant.offlinemanager.data.local.entity.ProjectStatus
 import com.restaurant.offlinemanager.domain.model.ProjectFinance
 import com.restaurant.offlinemanager.domain.model.ProjectInput
@@ -89,9 +102,7 @@ fun ProjectsListScreen(
     ) {
         item { AppSearchBar(query, { query = it }, label = "جستجو در پروژه‌ها") }
         item { FilterChipRow(filters, filter, { filter = it }) }
-        item {
-            GoldPrimaryButton("افزودن پروژه", onClick = onAddProject)
-        }
+        item { GoldPrimaryButton("افزودن پروژه", onClick = onAddProject) }
         if (finances.isEmpty()) {
             item { EmptyState("پروژه‌ای پیدا نشد", "فیلتر یا عبارت جستجو را تغییر دهید.") }
         } else {
@@ -111,22 +122,55 @@ private fun ProjectCard(finance: ProjectFinance, onClick: () -> Unit) {
         ProjectStatus.SETTLED -> AppCyan
         ProjectStatus.ARCHIVED -> TextMuted
     }
-    GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(finance.project.name, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
-                Text(finance.project.companyName.orEmpty(), color = TextSecondary)
-                Text(finance.project.address.orEmpty(), color = TextMuted, style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(8.dp))
-                Text("تعداد نفرات: ${NumberFormatter.format(finance.project.workerCount)}", color = TextSecondary)
-                Text("قیمت وعده: ${MoneyFormatter.format(finance.project.mealPrice)}", color = TextSecondary)
-                Text("مانده مطالبات: ${MoneyFormatter.format(finance.receivable)}", color = Gold, fontWeight = FontWeight.Bold)
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatusChip(finance.project.status.label(), statusColor)
-                TextButton(onClick = onClick) { Text("مشاهده", color = Gold) }
+    GlassCard(modifier = Modifier.fillMaxWidth(), accent = statusColor) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            ProjectThumb(finance.project.name)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(finance.project.name, color = TextPrimary, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    StatusChip(finance.project.status.label(), statusColor)
+                }
+                Text(finance.project.companyName.orEmpty(), color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Icon(Icons.Outlined.LocationOn, contentDescription = null, tint = TextMuted, modifier = Modifier.size(15.dp))
+                    Text(finance.project.address.orEmpty(), color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    MiniInfo(Icons.Outlined.Groups, "${NumberFormatter.format(finance.project.workerCount)} نفر")
+                    MiniInfo(Icons.Outlined.Restaurant, MoneyFormatter.format(finance.project.mealPrice))
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("مانده مطالبات", color = TextSecondary, modifier = Modifier.weight(1f))
+                    MoneyText(finance.receivable.coerceAtLeast(0), style = MaterialTheme.typography.titleMedium)
+                }
             }
         }
+        Spacer(Modifier.height(8.dp))
+        TextButton(onClick = onClick, modifier = Modifier.align(Alignment.End)) {
+            Text("مشاهده جزئیات", color = Gold)
+        }
+    }
+}
+
+@Composable
+private fun ProjectThumb(name: String) {
+    Box(
+        modifier = Modifier
+            .size(76.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Brush.linearGradient(listOf(Gold.copy(alpha = 0.32f), AppCyan.copy(alpha = 0.16f)))),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(Icons.Outlined.Business, contentDescription = null, tint = GoldLight, modifier = Modifier.size(34.dp))
+        Text(name.take(1), color = TextPrimary, style = MaterialTheme.typography.titleLarge, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp))
+    }
+}
+
+@Composable
+private fun MiniInfo(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Icon(icon, contentDescription = null, tint = Gold, modifier = Modifier.size(15.dp))
+        Text(text, color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -156,26 +200,28 @@ fun ProjectFormScreen(
             .padding(horizontal = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item { SectionHeader(if (editing == null) "افزودن پروژه" else "ویرایش پروژه") }
         item {
-            SectionHeader(if (editing == null) "افزودن پروژه" else "ویرایش پروژه")
+            GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
+                DarkOutlinedTextField(name, { name = it }, "نام پروژه")
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(company, { company = it }, "نام شرکت/کارفرما")
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(address, { address = it }, "آدرس پروژه", singleLine = false)
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(manager, { manager = it }, "نام مدیر / مسئول")
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(phone, { phone = it }, "شماره تماس", keyboardType = KeyboardType.Phone)
+            }
         }
-        item { DarkOutlinedTextField(name, { name = it }, "نام پروژه") }
-        item { DarkOutlinedTextField(company, { company = it }, "نام شرکت/کارفرما") }
-        item { DarkOutlinedTextField(address, { address = it }, "آدرس پروژه", singleLine = false) }
-        item { DarkOutlinedTextField(manager, { manager = it }, "نام مدیر / مسئول") }
-        item { DarkOutlinedTextField(phone, { phone = it }, "شماره تماس", keyboardType = KeyboardType.Phone) }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 DarkOutlinedTextField(workers, { workers = it }, "تعداد نفرات", modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
                 MoneyField(mealPrice, { mealPrice = it }, "قیمت هر وعده", modifier = Modifier.weight(1f))
             }
         }
-        item {
-            OptionSelector("نوع وعده پیش‌فرض", listOf("صبحانه", "ناهار", "شام"), defaultMeal, { it }) { defaultMeal = it }
-        }
-        item {
-            OptionSelector("وضعیت", ProjectStatus.entries, status, { it.label() }) { status = it }
-        }
+        item { OptionSelector("نوع وعده پیش‌فرض", listOf("صبحانه", "ناهار", "شام"), defaultMeal, { it }) { defaultMeal = it } }
+        item { OptionSelector("وضعیت", ProjectStatus.entries, status, { it.label() }) { status = it } }
         item { DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false) }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }
         item {
@@ -240,7 +286,7 @@ fun ProjectDetailsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            GlassCard(Modifier.fillMaxWidth()) {
+            GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
                 Text(finance.project.name, color = TextPrimary, style = MaterialTheme.typography.headlineMedium)
                 Text(finance.project.companyName.orEmpty(), color = TextSecondary)
                 Text(finance.project.address.orEmpty(), color = TextMuted)
@@ -282,7 +328,7 @@ fun ProjectDetailsScreen(
 
 @Composable
 private fun DetailMetric(title: String, value: String, modifier: Modifier = Modifier) {
-    GlassCard(modifier = modifier) {
+    GlassCard(modifier = modifier, accent = Gold) {
         Text(title, color = TextSecondary)
         Text(value, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
     }
