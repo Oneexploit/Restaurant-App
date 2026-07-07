@@ -1,0 +1,58 @@
+package com.restaurant.offlinemanager.core.navigation
+
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Inventory
+import androidx.compose.material.icons.outlined.List
+import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.ui.graphics.vector.ImageVector
+
+object Routes {
+    const val Home = "home"
+    const val ProjectsList = "projects"
+    const val ProjectDetails = "projectDetails"
+    const val AddEditProject = "addEditProject"
+    const val MealDeliveryList = "mealDeliveries"
+    const val AddEditMealDelivery = "addEditMealDelivery"
+    const val WarehousesList = "warehouse"
+    const val WarehouseDetails = "warehouseDetails"
+    const val MaterialsList = "materials"
+    const val AddEditWarehouse = "addEditWarehouse"
+    const val AddEditMaterial = "addEditMaterial"
+    const val StockTransactions = "stockTransactions"
+    const val AddStockIn = "addStockIn"
+    const val AddStockOut = "addStockOut"
+    const val TransferStock = "transferStock"
+    const val PurchasesList = "purchases"
+    const val AddEditPurchase = "addEditPurchase"
+    const val FinanceDashboard = "finance"
+    const val BankCards = "bankCards"
+    const val AddEditBankCard = "addEditBankCard"
+    const val ProjectPayments = "projectPayments"
+    const val AddProjectPayment = "addProjectPayment"
+    const val SupplierPayments = "supplierPayments"
+    const val AddSupplierPayment = "addSupplierPayment"
+    const val Expenses = "expenses"
+    const val AddExpense = "addExpense"
+    const val Reports = "reports"
+    const val GlobalSearch = "search"
+    const val Settings = "settings"
+    const val BackupRestore = "backupRestore"
+}
+
+data class BottomDestination(
+    val route: String,
+    val label: String,
+    val icon: ImageVector
+)
+
+val BottomDestinations = listOf(
+    BottomDestination(Routes.Home, "خانه", Icons.Outlined.Home),
+    BottomDestination(Routes.ProjectsList, "پروژه‌ها", Icons.Outlined.List),
+    BottomDestination(Routes.WarehousesList, "انبار", Icons.Outlined.Inventory),
+    BottomDestination(Routes.PurchasesList, "خرید روزانه", Icons.Outlined.ShoppingCart),
+    BottomDestination(Routes.FinanceDashboard, "مالی", Icons.Outlined.AccountBalanceWallet),
+    BottomDestination(Routes.Reports, "گزارش‌ها", Icons.Outlined.BarChart)
+)
