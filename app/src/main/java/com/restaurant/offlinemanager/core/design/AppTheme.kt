@@ -20,7 +20,7 @@ private val DarkColors = darkColorScheme(
     onBackground = TextPrimary,
     surface = SurfaceGlass,
     onSurface = TextPrimary,
-    surfaceVariant = SurfaceGlass2,
+    surfaceVariant = SurfaceGlassStrong,
     onSurfaceVariant = TextSecondary,
     error = AppRed,
     onError = TextPrimary
@@ -42,8 +42,17 @@ fun Modifier.appBackground(): Modifier =
         Brush.verticalGradient(
             listOf(
                 BackgroundStart,
-                Color(0xFF0A101B),
+                BackgroundMid,
                 BackgroundEnd
             )
+        )
+    )
+
+fun premiumBackgroundBrush(): Brush =
+    Brush.verticalGradient(
+        listOf(
+            BackgroundStart,
+            BackgroundMid,
+            BackgroundEnd
         )
     )

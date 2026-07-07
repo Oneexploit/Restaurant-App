@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -20,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.restaurant.offlinemanager.core.design.AppSearchBar
 import com.restaurant.offlinemanager.core.design.EmptyState
+import com.restaurant.offlinemanager.core.design.FilterChipRow
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.SectionHeader
@@ -44,6 +46,7 @@ fun SearchScreen(
     modifier: Modifier = Modifier
 ) {
     var query by remember { mutableStateOf("") }
+    var selectedType by remember { mutableStateOf("همه") }
     val results = remember(query, state.snapshot) {
         if (query.isBlank()) emptyList() else buildList {
             state.snapshot.projects.filter { it.name.contains(query) || it.companyName.orEmpty().contains(query) }.forEach {
@@ -70,11 +73,16 @@ fun SearchScreen(
             }
         }
     }
+    val typeOptions = listOf("همه") + results.map { it.type }.distinct()
+    val visibleResults = if (selectedType == "همه") results else results.filter { it.type == selectedType }
+    LaunchedEffect(query) {
+        selectedType = "همه"
+    }
 
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { SectionHeader("جستجوی عمومی") }
@@ -84,13 +92,21 @@ fun SearchScreen(
         } else if (results.isEmpty()) {
             item { EmptyState("نتیجه‌ای پیدا نشد", "عبارت دیگری را امتحان کنید.") }
         } else {
-            items(results, key = { it.id }) { result ->
-                GlassCard(Modifier.fillMaxWidth()) {
-                    Column {
-                        StatusChip(result.type, Gold)
-                        Spacer(Modifier.height(8.dp))
-                        Text(result.title, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
-                        Text(result.subtitle, color = TextSecondary)
+            item { FilterChipRow(typeOptions, selectedType, { selectedType = it }) }
+            if (visibleResults.isEmpty()) {
+                item { EmptyState("در این دسته چیزی پیدا نشد", "فیلتر نتیجه را تغییر دهید یا عبارت دیگری وارد کنید.") }
+            } else {
+                visibleResults.groupBy { it.type }.forEach { (type, groupedResults) ->
+                    item { SectionHeader(type) }
+                    items(groupedResults, key = { it.id }) { result ->
+                        GlassCard(Modifier.fillMaxWidth()) {
+                            Column {
+                                StatusChip(result.type, Gold)
+                                Spacer(Modifier.height(8.dp))
+                                Text(result.title, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+                                Text(result.subtitle, color = TextSecondary)
+                            }
+                        }
                     }
                 }
             }

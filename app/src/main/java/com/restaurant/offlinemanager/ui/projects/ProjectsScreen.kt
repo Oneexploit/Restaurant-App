@@ -75,18 +75,21 @@ fun ProjectsListScreen(
     state: AppUiState,
     onAddProject: () -> Unit,
     onProjectDetails: (Long) -> Unit,
+    onAddMeal: (Long) -> Unit,
+    onAddPayment: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("همه") }
-    val filters = listOf("همه", "فعال", "در حال اجرا", "تسویه‌شده", "آرشیو")
+    val filters = listOf("همه", "فعال", "متوقف", "تسویه‌شده", "آرشیو")
     val finances = state.projectFinances.filter { finance ->
         val matchesQuery = query.isBlank() ||
             finance.project.name.contains(query, ignoreCase = true) ||
             finance.project.companyName.orEmpty().contains(query, ignoreCase = true) ||
             finance.project.address.orEmpty().contains(query, ignoreCase = true)
         val matchesFilter = when (filter) {
-            "فعال", "در حال اجرا" -> finance.project.status == ProjectStatus.ACTIVE
+            "فعال" -> finance.project.status == ProjectStatus.ACTIVE
+            "متوقف" -> finance.project.status == ProjectStatus.PAUSED
             "تسویه‌شده" -> finance.project.status == ProjectStatus.SETTLED
             "آرشیو" -> finance.project.status == ProjectStatus.ARCHIVED
             else -> true
@@ -107,7 +110,12 @@ fun ProjectsListScreen(
             item { EmptyState("پروژه‌ای پیدا نشد", "فیلتر یا عبارت جستجو را تغییر دهید.") }
         } else {
             items(finances, key = { it.project.id }) { finance ->
-                ProjectCard(finance, onClick = { onProjectDetails(finance.project.id) })
+                ProjectCard(
+                    finance = finance,
+                    onClick = { onProjectDetails(finance.project.id) },
+                    onAddMeal = { onAddMeal(finance.project.id) },
+                    onAddPayment = { onAddPayment(finance.project.id) }
+                )
             }
         }
         item { Spacer(Modifier.height(20.dp)) }
@@ -115,7 +123,12 @@ fun ProjectsListScreen(
 }
 
 @Composable
-private fun ProjectCard(finance: ProjectFinance, onClick: () -> Unit) {
+private fun ProjectCard(
+    finance: ProjectFinance,
+    onClick: () -> Unit,
+    onAddMeal: () -> Unit,
+    onAddPayment: () -> Unit
+) {
     val statusColor = when (finance.project.status) {
         ProjectStatus.ACTIVE -> AppGreen
         ProjectStatus.PAUSED -> AppOrange
@@ -146,8 +159,16 @@ private fun ProjectCard(finance: ProjectFinance, onClick: () -> Unit) {
             }
         }
         Spacer(Modifier.height(8.dp))
-        TextButton(onClick = onClick, modifier = Modifier.align(Alignment.End)) {
-            Text("مشاهده جزئیات", color = Gold)
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.align(Alignment.End)) {
+            TextButton(onClick = onClick) {
+                Text("جزئیات", color = Gold)
+            }
+            TextButton(onClick = onAddMeal) {
+                Text("ثبت وعده", color = AppCyan)
+            }
+            TextButton(onClick = onAddPayment) {
+                Text("ثبت دریافت", color = AppGreen)
+            }
         }
     }
 }
@@ -197,10 +218,11 @@ fun ProjectFormScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { SectionHeader(if (editing == null) "افزودن پروژه" else "ویرایش پروژه") }
+        item { SectionHeader("اطلاعات پروژه") }
         item {
             GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
                 DarkOutlinedTextField(name, { name = it }, "نام پروژه")
@@ -208,21 +230,47 @@ fun ProjectFormScreen(
                 DarkOutlinedTextField(company, { company = it }, "نام شرکت/کارفرما")
                 Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(address, { address = it }, "آدرس پروژه", singleLine = false)
-                Spacer(Modifier.height(10.dp))
+            }
+        }
+        item { SectionHeader("اطلاعات تماس") }
+        item {
+            GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
                 DarkOutlinedTextField(manager, { manager = it }, "نام مدیر / مسئول")
                 Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(phone, { phone = it }, "شماره تماس", keyboardType = KeyboardType.Phone)
             }
         }
+        item { SectionHeader("قرارداد و وعده") }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                DarkOutlinedTextField(workers, { workers = it }, "تعداد نفرات", modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
-                MoneyField(mealPrice, { mealPrice = it }, "قیمت هر وعده", modifier = Modifier.weight(1f))
+            GlassCard(Modifier.fillMaxWidth(), accent = AppPurple) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    DarkOutlinedTextField(workers, { workers = it }, "تعداد نفرات", modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
+                    MoneyField(mealPrice, { mealPrice = it }, "قیمت هر وعده", modifier = Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(10.dp))
+                OptionSelector("نوع وعده پیش‌فرض", listOf("صبحانه", "ناهار", "شام"), defaultMeal, { it }) { defaultMeal = it }
             }
         }
-        item { OptionSelector("نوع وعده پیش‌فرض", listOf("صبحانه", "ناهار", "شام"), defaultMeal, { it }) { defaultMeal = it } }
-        item { OptionSelector("وضعیت", ProjectStatus.entries, status, { it.label() }) { status = it } }
-        item { DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false) }
+        item { SectionHeader("وضعیت و توضیحات") }
+        item {
+            GlassCard(Modifier.fillMaxWidth(), accent = AppOrange) {
+                OptionSelector("وضعیت", ProjectStatus.entries, status, { it.label() }) { status = it }
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false)
+            }
+        }
+        item {
+            val workerCount = NumberFormatter.normalizeDigits(workers).toIntOrNull() ?: 0
+            val price = MoneyFormatter.parse(mealPrice)
+            GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
+                Text("پیش‌نمایش قرارداد", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(8.dp))
+                Text("وعده پیش‌فرض: $defaultMeal", color = TextSecondary)
+                Text("تعداد نفرات: ${NumberFormatter.format(workerCount)} نفر", color = TextSecondary)
+                Text("مبلغ هر وعده برای پروژه", color = TextMuted)
+                MoneyText((workerCount * price).coerceAtLeast(0), style = MaterialTheme.typography.headlineSmall)
+            }
+        }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }
         item {
             GoldPrimaryButton(
@@ -279,10 +327,18 @@ fun ProjectDetailsScreen(
         EmptyState("پروژه پیدا نشد", "ممکن است پروژه آرشیو یا بازیابی شده باشد.", modifier.padding(18.dp))
         return
     }
+    val recentMeals = state.snapshot.mealDeliveries
+        .filter { it.projectId == projectId }
+        .sortedByDescending { it.date }
+        .take(5)
+    val recentPayments = state.snapshot.projectPayments
+        .filter { it.projectId == projectId }
+        .sortedByDescending { it.date }
+        .take(5)
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
@@ -310,6 +366,40 @@ fun ProjectDetailsScreen(
         item { GoldPrimaryButton(text = "ثبت پرداخت", icon = Icons.Outlined.Payments, onClick = { onAddPayment(projectId) }) }
         item { GoldPrimaryButton(text = "ویرایش پروژه", icon = Icons.Outlined.Edit, onClick = { onEdit(projectId) }) }
         item { GoldPrimaryButton(text = "آرشیو پروژه", icon = Icons.Outlined.Archive, onClick = { confirmArchive = true }) }
+        item { SectionHeader("آخرین وعده‌ها") }
+        if (recentMeals.isEmpty()) {
+            item { EmptyState("وعده‌ای برای این پروژه ثبت نشده", "از دکمه ثبت وعده، تحویل‌های پروژه را وارد کنید.") }
+        } else {
+            items(recentMeals, key = { it.id }) { meal ->
+                GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Restaurant, contentDescription = null, tint = AppCyan)
+                        Column(Modifier.weight(1f)) {
+                            Text(meal.mealType.label(), color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                            Text("${PersianDateFormatter.format(meal.date)} • ${NumberFormatter.format(meal.quantity)} نفر", color = TextSecondary)
+                        }
+                        MoneyText(meal.totalAmount, style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
+        }
+        item { SectionHeader("آخرین دریافت‌ها") }
+        if (recentPayments.isEmpty()) {
+            item { EmptyState("دریافتی ثبت نشده", "پرداخت‌های مشتری اینجا به تفکیک تاریخ دیده می‌شود.") }
+        } else {
+            items(recentPayments, key = { it.id }) { payment ->
+                GlassCard(Modifier.fillMaxWidth(), accent = AppGreen) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Payments, contentDescription = null, tint = AppGreen)
+                        Column(Modifier.weight(1f)) {
+                            Text(payment.method.label(), color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                            Text(PersianDateFormatter.format(payment.date), color = TextSecondary)
+                        }
+                        MoneyText(payment.amount, style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
+        }
         item { Spacer(Modifier.height(20.dp)) }
     }
     if (confirmArchive) {

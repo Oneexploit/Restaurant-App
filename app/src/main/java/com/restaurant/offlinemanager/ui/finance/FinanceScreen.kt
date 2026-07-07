@@ -34,6 +34,7 @@ import com.restaurant.offlinemanager.core.design.AppOrange
 import com.restaurant.offlinemanager.core.design.AppPurple
 import com.restaurant.offlinemanager.core.design.AppRed
 import com.restaurant.offlinemanager.core.design.DarkOutlinedTextField
+import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.FilterChipRow
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
@@ -74,7 +75,7 @@ fun FinanceDashboardScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
@@ -112,57 +113,77 @@ fun FinanceDashboardScreen(
         when (tab) {
             0 -> {
                 item { GoldPrimaryButton("ثبت دریافت", onClick = onAddProjectPayment, icon = Icons.Outlined.Add) }
-                items(state.projectFinances, key = { it.project.id }) { finance ->
-                    FinanceRow(
-                        title = finance.project.name,
-                        subtitle = "تحویل ${MoneyFormatter.format(finance.totalDelivered)} • پرداخت ${MoneyFormatter.format(finance.totalPaid)}",
-                        amount = finance.receivable,
-                        chip = "مانده",
-                        color = AppPurple
-                    )
+                if (state.projectFinances.isEmpty()) {
+                    item { EmptyState("مطالبه‌ای وجود ندارد", "پس از ثبت پروژه و وعده، مانده پروژه‌ها اینجا نمایش داده می‌شود.") }
+                } else {
+                    items(state.projectFinances, key = { it.project.id }) { finance ->
+                        FinanceRow(
+                            title = finance.project.name,
+                            subtitle = "تحویل ${MoneyFormatter.format(finance.totalDelivered)} • پرداخت ${MoneyFormatter.format(finance.totalPaid)}",
+                            amount = finance.receivable,
+                            chip = "مانده",
+                            color = AppPurple
+                        )
+                    }
                 }
             }
             1 -> {
                 item { GoldPrimaryButton("ثبت پرداخت", onClick = onAddSupplierPayment, icon = Icons.Outlined.Add) }
-                items(state.supplierDebts, key = { it.supplier.id }) { debt ->
-                    FinanceRow(
-                        title = debt.supplier.name,
-                        subtitle = "خرید نسیه ${MoneyFormatter.format(debt.totalCreditPurchases)} • پرداخت ${MoneyFormatter.format(debt.totalPaid)}",
-                        amount = debt.remaining,
-                        chip = "بدهی",
-                        color = AppOrange
-                    )
+                if (state.supplierDebts.isEmpty()) {
+                    item { EmptyState("بدهی تامین‌کننده‌ای وجود ندارد", "خریدهای نسیه و پرداخت‌های تامین‌کننده بعد از ثبت اینجا دیده می‌شوند.") }
+                } else {
+                    items(state.supplierDebts, key = { it.supplier.id }) { debt ->
+                        FinanceRow(
+                            title = debt.supplier.name,
+                            subtitle = "خرید نسیه ${MoneyFormatter.format(debt.totalCreditPurchases)} • پرداخت ${MoneyFormatter.format(debt.totalPaid)}",
+                            amount = debt.remaining,
+                            chip = "بدهی",
+                            color = AppOrange
+                        )
+                    }
                 }
             }
             2 -> {
                 item { GoldPrimaryButton("افزودن کارت بانکی", onClick = onAddBankCard, icon = Icons.Outlined.Add) }
-                items(state.bankBalances, key = { it.card.id }) { balance ->
-                    GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = null, tint = AppCyan)
-                            Column(Modifier.weight(1f)) {
-                                Text(balance.card.title, color = TextPrimary, style = MaterialTheme.typography.titleMedium)
-                                Text("${balance.card.bankName.orEmpty()} • ${maskCardNumber(balance.card.cardNumber)}", color = TextSecondary)
+                if (state.bankBalances.isEmpty()) {
+                    item { EmptyState("کارت بانکی ثبت نشده", "برای پیگیری پرداخت‌ها و موجودی، کارت بانکی اضافه کنید.") }
+                } else {
+                    items(state.bankBalances, key = { it.card.id }) { balance ->
+                        GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = null, tint = AppCyan)
+                                Column(Modifier.weight(1f)) {
+                                    Text(balance.card.title, color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                                    Text("${balance.card.bankName.orEmpty()} • ${maskCardNumber(balance.card.cardNumber)}", color = TextSecondary)
+                                }
+                                MoneyText(balance.balance, style = MaterialTheme.typography.titleMedium)
                             }
-                            MoneyText(balance.balance, style = MaterialTheme.typography.titleMedium)
                         }
                     }
                 }
             }
             3 -> {
-                items(state.snapshot.projectPayments, key = { "p${it.id}" }) { payment ->
-                    val project = state.snapshot.projects.firstOrNull { it.id == payment.projectId }
-                    PaymentCard("دریافت پروژه", project?.name.orEmpty(), payment.amount, payment.date, payment.method.label(), AppGreen)
-                }
-                items(state.snapshot.supplierPayments, key = { "s${it.id}" }) { payment ->
-                    val supplier = state.snapshot.suppliers.firstOrNull { it.id == payment.supplierId }
-                    PaymentCard("پرداخت تامین‌کننده", supplier?.name.orEmpty(), payment.amount, payment.date, payment.method.label(), AppOrange)
+                if (state.snapshot.projectPayments.isEmpty() && state.snapshot.supplierPayments.isEmpty()) {
+                    item { EmptyState("پرداختی ثبت نشده", "دریافت از پروژه و پرداخت به تامین‌کننده در این بخش تجمیع می‌شود.") }
+                } else {
+                    items(state.snapshot.projectPayments, key = { "p${it.id}" }) { payment ->
+                        val project = state.snapshot.projects.firstOrNull { it.id == payment.projectId }
+                        PaymentCard("دریافت پروژه", project?.name.orEmpty(), payment.amount, payment.date, payment.method.label(), AppGreen)
+                    }
+                    items(state.snapshot.supplierPayments, key = { "s${it.id}" }) { payment ->
+                        val supplier = state.snapshot.suppliers.firstOrNull { it.id == payment.supplierId }
+                        PaymentCard("پرداخت تامین‌کننده", supplier?.name.orEmpty(), payment.amount, payment.date, payment.method.label(), AppOrange)
+                    }
                 }
             }
             4 -> {
                 item { GoldPrimaryButton("افزودن هزینه", onClick = onAddExpense, icon = Icons.Outlined.Add) }
-                items(state.snapshot.expenses, key = { it.id }) { expense ->
-                    PaymentCard(expense.category.label(), expense.title, expense.amount, expense.date, "هزینه", AppRed)
+                if (state.snapshot.expenses.isEmpty()) {
+                    item { EmptyState("هزینه‌ای ثبت نشده", "هزینه‌های جاری کسب‌وکار بعد از ثبت اینجا دیده می‌شود.") }
+                } else {
+                    items(state.snapshot.expenses, key = { it.id }) { expense ->
+                        PaymentCard(expense.category.label(), expense.title, expense.amount, expense.date, "هزینه", AppRed)
+                    }
                 }
             }
         }
@@ -216,6 +237,10 @@ fun ProjectPaymentFormScreen(
     var method by remember { mutableStateOf(PaymentMethod.BANK_TRANSFER) }
     var notes by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    val remaining = state.projectFinances
+        .firstOrNull { it.project.id == project?.id }
+        ?.receivable
+        ?.coerceAtLeast(0) ?: 0L
     PaymentFormLayout(
         title = "ثبت دریافت از پروژه",
         partyLabel = "پروژه",
@@ -233,11 +258,14 @@ fun ProjectPaymentFormScreen(
         notes = notes,
         onNotes = { notes = it },
         error = error,
+        balanceLabel = "مانده مطالبات",
+        balanceAmount = remaining,
         onSave = {
             val value = MoneyFormatter.parse(amount)
             error = when {
                 project == null -> "پروژه را انتخاب کنید"
                 value <= 0 -> "مبلغ باید بیشتر از صفر باشد"
+                remaining > 0 && value > remaining -> "مبلغ پرداختی بیشتر از مانده است"
                 else -> null
             }
             val p = project
@@ -261,6 +289,10 @@ fun SupplierPaymentFormScreen(
     var method by remember { mutableStateOf(PaymentMethod.CARD_TO_CARD) }
     var notes by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    val remaining = state.supplierDebts
+        .firstOrNull { it.supplier.id == supplier?.id }
+        ?.remaining
+        ?.coerceAtLeast(0) ?: 0L
     PaymentFormLayout(
         title = "ثبت پرداخت به تامین‌کننده",
         partyLabel = "تامین‌کننده",
@@ -278,11 +310,14 @@ fun SupplierPaymentFormScreen(
         notes = notes,
         onNotes = { notes = it },
         error = error,
+        balanceLabel = "مانده بدهی",
+        balanceAmount = remaining,
         onSave = {
             val value = MoneyFormatter.parse(amount)
             error = when {
                 supplier == null -> "تامین‌کننده را انتخاب کنید"
                 value <= 0 -> "مبلغ باید بیشتر از صفر باشد"
+                remaining > 0 && value > remaining -> "مبلغ پرداختی بیشتر از مانده است"
                 else -> null
             }
             val s = supplier
@@ -312,6 +347,8 @@ private fun <T> PaymentFormLayout(
     notes: String,
     onNotes: (String) -> Unit,
     error: String?,
+    balanceLabel: String? = null,
+    balanceAmount: Long? = null,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -325,6 +362,13 @@ private fun <T> PaymentFormLayout(
         item {
             GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
                 OptionSelector(partyLabel, parties, party, partyName, onSelected = onParty)
+                if (balanceLabel != null && balanceAmount != null) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(balanceLabel, color = TextSecondary, modifier = Modifier.weight(1f))
+                        MoneyText(balanceAmount, style = MaterialTheme.typography.titleMedium)
+                    }
+                }
                 Spacer(Modifier.height(10.dp))
                 MoneyField(amount, onAmount, "مبلغ")
                 Spacer(Modifier.height(10.dp))

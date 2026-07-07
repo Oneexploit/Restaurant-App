@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.restaurant.offlinemanager.core.design.AppCyan
+import com.restaurant.offlinemanager.core.design.AppSearchBar
 import com.restaurant.offlinemanager.core.design.DarkOutlinedTextField
 import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.FilterChipRow
@@ -35,6 +36,7 @@ import com.restaurant.offlinemanager.core.design.MoneyField
 import com.restaurant.offlinemanager.core.design.OptionSelector
 import com.restaurant.offlinemanager.core.design.QuantityField
 import com.restaurant.offlinemanager.core.design.SectionHeader
+import com.restaurant.offlinemanager.core.design.SecondaryGlassButton
 import com.restaurant.offlinemanager.core.design.StatusChip
 import com.restaurant.offlinemanager.core.design.TextPrimary
 import com.restaurant.offlinemanager.core.design.TextSecondary
@@ -93,6 +95,12 @@ fun MealDeliveryFormScreen(
     modifier: Modifier = Modifier
 ) {
     val projects = state.snapshot.projects.filter { it.status.name != "ARCHIVED" }
+    var projectQuery by remember { mutableStateOf("") }
+    val filteredProjects = projects.filter {
+        projectQuery.isBlank() ||
+            it.name.contains(projectQuery) ||
+            it.companyName.orEmpty().contains(projectQuery)
+    }
     var selectedProject by remember { mutableStateOf<ProjectEntity?>(projects.firstOrNull { it.id == preselectedProjectId } ?: projects.firstOrNull()) }
     var mealType by remember { mutableStateOf(MealType.LUNCH) }
     var quantity by remember { mutableStateOf(selectedProject?.workerCount?.toString().orEmpty()) }
@@ -118,8 +126,9 @@ fun MealDeliveryFormScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { SectionHeader("ثبت وعده") }
+        item { AppSearchBar(projectQuery, { projectQuery = it }, label = "جستجوی پروژه") }
         item {
-            OptionSelector("انتخاب پروژه", projects, selectedProject, { it.name }) { selectedProject = it }
+            OptionSelector("انتخاب پروژه", filteredProjects, selectedProject, { "${it.name} • ${it.workerCount} نفر" }) { selectedProject = it }
         }
         item {
             FilterChipRow(
@@ -127,6 +136,28 @@ fun MealDeliveryFormScreen(
                 selected = mealType.label(),
                 onSelected = { label -> mealType = MealType.entries.first { it.label() == label } }
             )
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SecondaryGlassButton(
+                    text = "نفرات پروژه",
+                    onClick = { quantity = selectedProject?.workerCount?.toString().orEmpty() },
+                    modifier = Modifier.weight(1f),
+                    accent = AppCyan
+                )
+                SecondaryGlassButton(
+                    text = "+۵",
+                    onClick = { quantity = (count + 5).toString() },
+                    modifier = Modifier.weight(1f),
+                    accent = Gold
+                )
+                SecondaryGlassButton(
+                    text = "+۱۰",
+                    onClick = { quantity = (count + 10).toString() },
+                    modifier = Modifier.weight(1f),
+                    accent = Gold
+                )
+            }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -137,8 +168,10 @@ fun MealDeliveryFormScreen(
         item { DarkOutlinedTextField(PersianDateFormatter.format(PersianDateFormatter.todayStartMillis()), {}, "تاریخ", readOnly = true) }
         item { DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false) }
         item {
-            GlassCard(Modifier.fillMaxWidth()) {
-                Text("مبلغ کل", color = TextSecondary)
+            GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
+                Text("محاسبه زنده", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                Text("${NumberFormatter.format(count)} × ${MoneyFormatter.format(price)}", color = TextSecondary)
+                Spacer(Modifier.height(6.dp))
                 Text(MoneyFormatter.format(total), color = Gold, style = MaterialTheme.typography.headlineMedium)
             }
         }

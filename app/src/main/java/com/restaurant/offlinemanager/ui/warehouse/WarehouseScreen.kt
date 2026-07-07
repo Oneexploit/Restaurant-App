@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Inventory
 import androidx.compose.material.icons.outlined.Save
@@ -45,6 +46,7 @@ import com.restaurant.offlinemanager.core.design.OptionSelector
 import com.restaurant.offlinemanager.core.design.PersianDateText
 import com.restaurant.offlinemanager.core.design.QuantityField
 import com.restaurant.offlinemanager.core.design.SectionHeader
+import com.restaurant.offlinemanager.core.design.SecondaryGlassButton
 import com.restaurant.offlinemanager.core.design.StatCard
 import com.restaurant.offlinemanager.core.design.StatusChip
 import com.restaurant.offlinemanager.core.design.TextMuted
@@ -79,7 +81,7 @@ fun WarehouseMainScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 18.dp)
+            .padding(horizontal = 16.dp)
     ) {
         FilterChipRow(tabs, tabs[tab], { tab = tabs.indexOf(it) })
         Spacer(Modifier.height(12.dp))
@@ -114,7 +116,7 @@ private fun InventoryTab(
 
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { AppSearchBar(query, { query = it }, label = "جستجو در موجودی") }
-        item { FilterChipRow(warehouseOptions.take(4), selectedWarehouse, { selectedWarehouse = it }) }
+        item { FilterChipRow(warehouseOptions, selectedWarehouse, { selectedWarehouse = it }) }
         if (lowStock.isNotEmpty()) {
             item {
                 GlassCard(Modifier.fillMaxWidth(), accent = AppOrange) {
@@ -126,6 +128,18 @@ private fun InventoryTab(
                         }
                     }
                 }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatCard("ارزش کل انبار", MoneyFormatter.format(items.sumOf { it.approximateValue }), Icons.Outlined.AccountBalanceWallet, Gold, Modifier.weight(1f))
+                StatCard("تعداد کالاها", NumberFormatter.format(items.size), Icons.Outlined.Inventory, AppCyan, Modifier.weight(1f), "قلم")
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatCard("اقلام کم‌موجودی", NumberFormatter.format(lowStock.size), Icons.Outlined.Warning, AppOrange, Modifier.weight(1f), "هشدار")
+                StatCard("کل تراکنش امروز", NumberFormatter.format(todayTransactions.size), Icons.Outlined.Inventory, AppGreen, Modifier.weight(1f), "ثبت")
             }
         }
         item {
@@ -145,7 +159,7 @@ private fun InventoryTab(
             item { EmptyState("موجودی خالی است", "پس از ثبت خرید یا ورود کالا، موجودی اینجا نمایش داده می‌شود.") }
         } else {
             items(items, key = { "${it.warehouseId}-${it.materialId}" }) { item ->
-                InventoryCard(item)
+                InventoryCard(item, onStockIn, onStockOut)
             }
         }
         item { Spacer(Modifier.height(20.dp)) }
@@ -153,7 +167,7 @@ private fun InventoryTab(
 }
 
 @Composable
-private fun InventoryCard(item: InventoryItem) {
+private fun InventoryCard(item: InventoryItem, onStockIn: () -> Unit, onStockOut: () -> Unit) {
     GlassCard(Modifier.fillMaxWidth(), accent = if (item.isLowStock) AppOrange else AppCyan) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(item.emoji ?: "•", style = MaterialTheme.typography.headlineMedium)
@@ -168,6 +182,11 @@ private fun InventoryCard(item: InventoryItem) {
                 MoneyText(item.approximateValue, style = MaterialTheme.typography.titleMedium)
             }
         }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SecondaryGlassButton("ورود", onClick = onStockIn, modifier = Modifier.weight(1f), accent = AppGreen)
+            SecondaryGlassButton("خروج", onClick = onStockOut, modifier = Modifier.weight(1f), accent = if (item.isLowStock) AppOrange else AppCyan)
+        }
     }
 }
 
@@ -175,19 +194,23 @@ private fun InventoryCard(item: InventoryItem) {
 private fun WarehousesTab(state: AppUiState, onAddWarehouse: () -> Unit) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { GoldPrimaryButton("افزودن انبار", onClick = onAddWarehouse, icon = Icons.Outlined.Add) }
-        items(state.snapshot.warehouses, key = { it.id }) { warehouse ->
-            val inventory = state.inventory.filter { it.warehouseId == warehouse.id }
-            GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Inventory, contentDescription = null, tint = Gold)
-                    Column(Modifier.weight(1f)) {
-                        Text(warehouse.name, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
-                        Text(warehouse.type.label(), color = TextSecondary)
-                        Text(warehouse.address.orEmpty(), color = TextMuted)
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("${NumberFormatter.format(inventory.count())} قلم", color = TextSecondary)
-                        MoneyText(inventory.sumOf { it.approximateValue }, style = MaterialTheme.typography.titleMedium)
+        if (state.snapshot.warehouses.isEmpty()) {
+            item { EmptyState("انباری ثبت نشده", "برای مدیریت موجودی، اولین انبار را اضافه کنید.") }
+        } else {
+            items(state.snapshot.warehouses, key = { it.id }) { warehouse ->
+                val inventory = state.inventory.filter { it.warehouseId == warehouse.id }
+                GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Inventory, contentDescription = null, tint = Gold)
+                        Column(Modifier.weight(1f)) {
+                            Text(warehouse.name, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+                            Text(warehouse.type.label(), color = TextSecondary)
+                            Text(warehouse.address.orEmpty(), color = TextMuted)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("${NumberFormatter.format(inventory.count())} قلم", color = TextSecondary)
+                            MoneyText(inventory.sumOf { it.approximateValue }, style = MaterialTheme.typography.titleMedium)
+                        }
                     }
                 }
             }
@@ -198,21 +221,26 @@ private fun WarehousesTab(state: AppUiState, onAddWarehouse: () -> Unit) {
 @Composable
 private fun TransactionsTab(state: AppUiState) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(state.snapshot.stockTransactions.take(60), key = { it.id }) { tx ->
-            val warehouse = state.snapshot.warehouses.firstOrNull { it.id == tx.warehouseId }
-            val material = state.snapshot.materials.firstOrNull { it.id == tx.materialId }
-            val positive = tx.type == StockTransactionType.IN || tx.type == StockTransactionType.TRANSFER_IN
-            GlassCard(Modifier.fillMaxWidth(), accent = if (positive) AppGreen else AppOrange) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Inventory, contentDescription = null, tint = if (positive) AppGreen else AppOrange)
-                    Column(Modifier.weight(1f)) {
-                        Text(material?.name ?: "کالای حذف‌شده", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
-                        Text("${warehouse?.name.orEmpty()} • ${tx.type.label()}", color = TextSecondary)
-                        PersianDateText(tx.date)
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        StatusChip(tx.reason.label(), if (positive) AppGreen else AppOrange)
-                        Text("${NumberFormatter.format(tx.quantity)} ${tx.unit.label()}", color = TextPrimary)
+        val transactions = state.snapshot.stockTransactions.take(60)
+        if (transactions.isEmpty()) {
+            item { EmptyState("تراکنشی ثبت نشده", "ورود، خروج یا انتقال کالا بعد از ثبت در اینجا دیده می‌شود.") }
+        } else {
+            items(transactions, key = { it.id }) { tx ->
+                val warehouse = state.snapshot.warehouses.firstOrNull { it.id == tx.warehouseId }
+                val material = state.snapshot.materials.firstOrNull { it.id == tx.materialId }
+                val positive = tx.type == StockTransactionType.IN || tx.type == StockTransactionType.TRANSFER_IN
+                GlassCard(Modifier.fillMaxWidth(), accent = if (positive) AppGreen else AppOrange) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Inventory, contentDescription = null, tint = if (positive) AppGreen else AppOrange)
+                        Column(Modifier.weight(1f)) {
+                            Text(material?.name ?: "کالای حذف‌شده", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                            Text("${warehouse?.name.orEmpty()} • ${tx.type.label()}", color = TextSecondary)
+                            PersianDateText(tx.date)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            StatusChip(tx.reason.label(), if (positive) AppGreen else AppOrange)
+                            Text("${NumberFormatter.format(tx.quantity)} ${tx.unit.label()}", color = TextPrimary)
+                        }
                     }
                 }
             }
@@ -224,18 +252,22 @@ private fun TransactionsTab(state: AppUiState) {
 private fun MaterialsTab(state: AppUiState, onAddMaterial: () -> Unit) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { GoldPrimaryButton("افزودن متریال", onClick = onAddMaterial, icon = Icons.Outlined.Add) }
-        items(state.snapshot.materials, key = { it.id }) { material ->
-            val category = state.snapshot.materialCategories.firstOrNull { it.id == material.categoryId }
-            GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(material.imageEmoji ?: "•", style = MaterialTheme.typography.headlineMedium)
-                    Column(Modifier.weight(1f)) {
-                        Text(material.name, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
-                        Text("واحد اصلی: ${material.mainUnit.label()}", color = TextSecondary)
-                        Text("حداقل موجودی: ${NumberFormatter.format(material.minimumStock)}", color = TextSecondary)
-                        Text("دسته‌بندی: ${category?.name ?: "بدون دسته"}", color = TextMuted)
+        if (state.snapshot.materials.isEmpty()) {
+            item { EmptyState("متریالی ثبت نشده", "مواد اولیه و اقلام مصرفی را برای استفاده در خرید و انبار اضافه کنید.") }
+        } else {
+            items(state.snapshot.materials, key = { it.id }) { material ->
+                val category = state.snapshot.materialCategories.firstOrNull { it.id == material.categoryId }
+                GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(material.imageEmoji ?: "•", style = MaterialTheme.typography.headlineMedium)
+                        Column(Modifier.weight(1f)) {
+                            Text(material.name, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+                            Text("واحد اصلی: ${material.mainUnit.label()}", color = TextSecondary)
+                            Text("حداقل موجودی: ${NumberFormatter.format(material.minimumStock)}", color = TextSecondary)
+                            Text("دسته‌بندی: ${category?.name ?: "بدون دسته"}", color = TextMuted)
+                        }
+                        StatusChip(if (material.isActive) "فعال" else "غیرفعال", if (material.isActive) AppGreen else TextMuted)
                     }
-                    StatusChip(if (material.isActive) "فعال" else "غیرفعال", if (material.isActive) AppGreen else TextMuted)
                 }
             }
         }
@@ -258,11 +290,15 @@ fun StockTransactionFormScreen(
     var unitPrice by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    val availableStock = state.inventory
+        .firstOrNull { it.warehouseId == fromWarehouse?.id && it.materialId == material?.id }
+        ?.quantity ?: 0.0
+    val isOutbound = mode == StockTransactionType.OUT || mode == StockTransactionType.TRANSFER_OUT || mode == StockTransactionType.WASTE
 
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { SectionHeader(mode.label()) }
@@ -275,6 +311,17 @@ fun StockTransactionFormScreen(
                 }
                 Spacer(Modifier.height(10.dp))
                 OptionSelector("متریال", materials, material, { it.name }) { material = it }
+                if (isOutbound) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("موجودی قابل خروج", color = TextSecondary, modifier = Modifier.weight(1f))
+                        Text(
+                            "${NumberFormatter.format(availableStock)} ${material?.mainUnit?.label().orEmpty()}",
+                            color = if (availableStock <= 0.0) AppRed else TextPrimary,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    }
+                }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     QuantityField(quantity, { quantity = it }, "مقدار", Modifier.weight(1f))
@@ -300,6 +347,7 @@ fun StockTransactionFormScreen(
                         qty <= 0.0 -> "مقدار باید بیشتر از صفر باشد"
                         mode == StockTransactionType.TRANSFER_OUT && toWarehouse == null -> "انبار مقصد را انتخاب کنید"
                         mode == StockTransactionType.TRANSFER_OUT && toWarehouse?.id == fromWarehouse?.id -> "انبار مبدا و مقصد نمی‌تواند یکسان باشد"
+                        isOutbound && qty > availableStock -> "موجودی کافی نیست"
                         else -> null
                     }
                     val wh = fromWarehouse

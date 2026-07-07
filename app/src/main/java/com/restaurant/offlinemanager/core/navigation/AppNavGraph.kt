@@ -78,6 +78,7 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                     onAddProject = { navController.navigate("${Routes.AddEditProject}/0") },
                     onAddMeal = { navController.navigate("${Routes.AddEditMealDelivery}/0") },
                     onStockIn = { navController.navigate(Routes.AddStockIn) },
+                    onStockOut = { navController.navigate(Routes.AddStockOut) },
                     onAddPurchase = { navController.navigate(Routes.AddEditPurchase) },
                     onAddPayment = { navController.navigate("${Routes.AddProjectPayment}/0") },
                     onReports = { navController.navigate(Routes.Reports) }
@@ -87,7 +88,9 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                 ProjectsListScreen(
                     state = state,
                     onAddProject = { navController.navigate("${Routes.AddEditProject}/0") },
-                    onProjectDetails = { navController.navigate("${Routes.ProjectDetails}/$it") }
+                    onProjectDetails = { navController.navigate("${Routes.ProjectDetails}/$it") },
+                    onAddMeal = { navController.navigate("${Routes.AddEditMealDelivery}/$it") },
+                    onAddPayment = { navController.navigate("${Routes.AddProjectPayment}/$it") }
                 )
             }
             composable(

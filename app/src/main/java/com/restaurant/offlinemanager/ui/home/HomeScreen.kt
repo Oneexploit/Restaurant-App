@@ -13,13 +13,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.BusinessCenter
 import androidx.compose.material.icons.outlined.Inventory
 import androidx.compose.material.icons.outlined.Payments
-import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material.icons.outlined.Warning
@@ -39,9 +40,11 @@ import com.restaurant.offlinemanager.core.design.AppOrange
 import com.restaurant.offlinemanager.core.design.AppPurple
 import com.restaurant.offlinemanager.core.design.AppRed
 import com.restaurant.offlinemanager.core.design.AppLogoMark
+import com.restaurant.offlinemanager.core.design.ActionCard
 import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
+import com.restaurant.offlinemanager.core.design.LowStockWarningCard
 import com.restaurant.offlinemanager.core.design.MoneyText
 import com.restaurant.offlinemanager.core.design.PersianDateText
 import com.restaurant.offlinemanager.core.design.SectionHeader
@@ -65,6 +68,7 @@ fun HomeScreen(
     onAddProject: () -> Unit,
     onAddMeal: () -> Unit,
     onStockIn: () -> Unit,
+    onStockOut: () -> Unit,
     onAddPurchase: () -> Unit,
     onAddPayment: () -> Unit,
     onReports: () -> Unit,
@@ -79,11 +83,12 @@ fun HomeScreen(
         .filter { it.date == today }
         .take(3)
     val lowStock = state.inventory.filter { it.isLowStock }.take(4)
+    val recentActivity = rememberHomeActivity(state)
 
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
@@ -97,7 +102,7 @@ fun HomeScreen(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     StatCard("هشدارهای انبار", NumberFormatter.format(stats.lowStockItemCount), Icons.Outlined.Warning, AppOrange, Modifier.weight(1f), "قلم کالا")
-                    StatCard("مطالبات پروژه‌ها", MoneyFormatter.format(stats.projectReceivablesTotal), Icons.Outlined.ReceiptLong, AppPurple, Modifier.weight(1f))
+                    StatCard("مطالبات پروژه‌ها", MoneyFormatter.format(stats.projectReceivablesTotal), Icons.AutoMirrored.Outlined.ReceiptLong, AppPurple, Modifier.weight(1f))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     StatCard("بدهی تامین‌کنندگان", MoneyFormatter.format(stats.supplierDebtsTotal), Icons.Outlined.Payments, AppRed, Modifier.weight(1f))
@@ -115,16 +120,19 @@ fun HomeScreen(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    QuickActionCard("افزودن پروژه", Icons.Outlined.Add, Gold, onAddProject, Modifier.weight(1f))
-                    QuickActionCard("ثبت وعده", Icons.Outlined.Restaurant, AppCyan, onAddMeal, Modifier.weight(1f))
-                    QuickActionCard("ورود کالا", Icons.Outlined.Inventory, AppGreen, onStockIn, Modifier.weight(1f))
+                    ActionCard("ثبت وعده", Icons.Outlined.Restaurant, AppCyan, onAddMeal, Modifier.weight(1f))
+                    ActionCard("خرید روزانه", Icons.Outlined.ShoppingCart, Gold, onAddPurchase, Modifier.weight(1f))
+                    ActionCard("ورود کالا", Icons.Outlined.Inventory, AppGreen, onStockIn, Modifier.weight(1f))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    QuickActionCard("خرید روزانه", Icons.Outlined.ShoppingCart, AppCyan, onAddPurchase, Modifier.weight(1f))
-                    QuickActionCard("دریافت پروژه", Icons.Outlined.Payments, AppPurple, onAddPayment, Modifier.weight(1f))
-                    QuickActionCard("گزارش‌ها", Icons.Outlined.BarChart, AppOrange, onReports, Modifier.weight(1f))
+                    ActionCard("خروج کالا", Icons.Outlined.RemoveCircleOutline, AppOrange, onStockOut, Modifier.weight(1f))
+                    ActionCard("دریافت پروژه", Icons.Outlined.Payments, AppPurple, onAddPayment, Modifier.weight(1f))
+                    ActionCard("گزارش‌ها", Icons.Outlined.BarChart, AppCyan, onReports, Modifier.weight(1f))
                 }
             }
+        }
+        item {
+            GoldPrimaryDashboardHint(onAddProject = onAddProject)
         }
         item {
             SectionHeader("پروژه‌های فعال")
@@ -169,15 +177,31 @@ fun HomeScreen(
             }
         }
         item {
-            SectionHeader("کمبود موجودی")
+            SectionHeader("هشدارهای انبار")
         }
         if (lowStock.isEmpty()) {
             item {
                 EmptyState("همه چیز مرتب است", "هیچ کالایی زیر حداقل موجودی نیست.")
             }
         } else {
+            item {
+                LowStockWarningCard(
+                    title = "نیاز به رسیدگی انبار",
+                    message = "${NumberFormatter.format(lowStock.size)} قلم کالا زیر حداقل موجودی است. خرید یا انتقال را در اولویت بگذارید."
+                )
+            }
             items(lowStock, key = { "${it.warehouseId}-${it.materialId}" }) { item ->
                 LowStockRow(item)
+            }
+        }
+        item {
+            SectionHeader("آخرین فعالیت‌ها")
+        }
+        if (recentActivity.isEmpty()) {
+            item { EmptyState("فعالیتی ثبت نشده", "بعد از ثبت وعده، خرید یا پرداخت، رویدادها اینجا دیده می‌شوند.") }
+        } else {
+            items(recentActivity, key = { it.id }) { activity ->
+                RecentActivityRow(activity)
             }
         }
         item { Spacer(Modifier.height(18.dp)) }
@@ -196,6 +220,26 @@ private fun GreetingCard() {
             }
             StatusChip("آفلاین", Gold)
         }
+    }
+}
+
+@Composable
+private fun GoldPrimaryDashboardHint(onAddProject: () -> Unit) {
+    GlassCard(modifier = Modifier.fillMaxWidth(), accent = Gold) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Icon(Icons.Outlined.BusinessCenter, contentDescription = null, tint = Gold)
+            Column(modifier = Modifier.weight(1f)) {
+                Text("شروع پروژه جدید", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                Text("برای قراردادهای جدید، پروژه را ثبت کنید و سپس وعده‌ها و دریافت‌ها را به آن وصل کنید.", color = TextSecondary)
+            }
+            StatusChip("یک‌بار", Gold)
+        }
+        Spacer(Modifier.height(10.dp))
+        com.restaurant.offlinemanager.core.design.SecondaryGlassButton(
+            text = "افزودن پروژه",
+            icon = Icons.Outlined.Add,
+            onClick = onAddProject
+        )
     }
 }
 
@@ -231,6 +275,82 @@ private fun LowStockRow(item: InventoryItem) {
                 Text("حداقل: ${NumberFormatter.format(item.minimumStock)} ${item.unit.label()}", color = TextMuted)
             }
             StatusChip("کمبود", AppOrange)
+        }
+    }
+}
+
+private data class HomeActivity(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val date: Long,
+    val amount: Long?,
+    val icon: ImageVector,
+    val color: Color
+)
+
+@Composable
+private fun rememberHomeActivity(state: AppUiState): List<HomeActivity> =
+    androidx.compose.runtime.remember(state.snapshot) {
+        buildList {
+            state.snapshot.mealDeliveries.take(8).forEach { meal ->
+                val project = state.snapshot.projects.firstOrNull { it.id == meal.projectId }
+                add(
+                    HomeActivity(
+                        id = "meal-${meal.id}",
+                        title = "ثبت وعده ${meal.mealType.label()}",
+                        subtitle = project?.name ?: "پروژه حذف‌شده",
+                        date = meal.date,
+                        amount = meal.totalAmount,
+                        icon = Icons.Outlined.Restaurant,
+                        color = AppCyan
+                    )
+                )
+            }
+            state.snapshot.purchases.take(8).forEach { purchase ->
+                val supplier = state.snapshot.suppliers.firstOrNull { it.id == purchase.supplierId }
+                add(
+                    HomeActivity(
+                        id = "purchase-${purchase.id}",
+                        title = "ثبت فاکتور خرید",
+                        subtitle = supplier?.name ?: purchase.invoiceNumber.orEmpty().ifBlank { "خرید روزانه" },
+                        date = purchase.date,
+                        amount = purchase.totalAmount,
+                        icon = Icons.Outlined.ShoppingCart,
+                        color = AppOrange
+                    )
+                )
+            }
+            state.snapshot.projectPayments.take(8).forEach { payment ->
+                val project = state.snapshot.projects.firstOrNull { it.id == payment.projectId }
+                add(
+                    HomeActivity(
+                        id = "project-payment-${payment.id}",
+                        title = "دریافت از پروژه",
+                        subtitle = project?.name ?: "پروژه",
+                        date = payment.date,
+                        amount = payment.amount,
+                        icon = Icons.Outlined.Payments,
+                        color = AppGreen
+                    )
+                )
+            }
+        }.sortedByDescending { it.date }.take(5)
+    }
+
+@Composable
+private fun RecentActivityRow(activity: HomeActivity) {
+    GlassCard(modifier = Modifier.fillMaxWidth(), accent = activity.color) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Icon(activity.icon, contentDescription = null, tint = activity.color)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(activity.title, color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                Text(activity.subtitle, color = TextSecondary, maxLines = 1)
+                PersianDateText(activity.date, color = TextMuted)
+            }
+            activity.amount?.let {
+                MoneyText(it, style = MaterialTheme.typography.titleMedium)
+            }
         }
     }
 }

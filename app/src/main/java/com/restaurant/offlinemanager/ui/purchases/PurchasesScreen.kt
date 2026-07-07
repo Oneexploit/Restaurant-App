@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material3.Icon
@@ -45,6 +46,7 @@ import com.restaurant.offlinemanager.core.design.OptionSelector
 import com.restaurant.offlinemanager.core.design.PersianDateText
 import com.restaurant.offlinemanager.core.design.QuantityField
 import com.restaurant.offlinemanager.core.design.SectionHeader
+import com.restaurant.offlinemanager.core.design.StatCard
 import com.restaurant.offlinemanager.core.design.StatusChip
 import com.restaurant.offlinemanager.core.design.TextMuted
 import com.restaurant.offlinemanager.core.design.TextPrimary
@@ -73,23 +75,27 @@ fun PurchasesListScreen(
         val filterMatch = filter == "همه" || purchase.paymentType.label() == filter
         queryMatch && filterMatch
     }
+    val creditPurchases = state.snapshot.purchases
+        .filter { it.paymentType == PurchasePaymentType.CREDIT }
+        .sumOf { it.totalAmount }
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { AppSearchBar(query, { query = it }, label = "جستجو در خریدها") }
         item { FilterChipRow(listOf("همه", "نقدی", "کارت", "نسیه"), filter, { filter = it }) }
         item {
-            GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Icon(Icons.Outlined.ShoppingCart, contentDescription = null, tint = AppCyan)
-                    Column(Modifier.weight(1f)) {
-                        Text("جمع خرید امروز", color = TextSecondary)
-                        MoneyText(state.dashboard.todayPurchasesTotal, style = MaterialTheme.typography.headlineMedium)
-                    }
-                }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatCard("خرید امروز", MoneyFormatter.format(state.dashboard.todayPurchasesTotal), Icons.Outlined.ShoppingCart, AppCyan, Modifier.weight(1f))
+                StatCard("خرید ماه", MoneyFormatter.format(state.dashboard.monthPurchasesTotal), Icons.Outlined.ShoppingCart, AppOrange, Modifier.weight(1f))
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatCard("خرید نسیه", MoneyFormatter.format(creditPurchases), Icons.Outlined.Payments, AppRed, Modifier.weight(1f))
+                StatCard("تعداد فاکتور", NumberFormatter.format(purchases.size), Icons.Outlined.ShoppingCart, AppGreen, Modifier.weight(1f), "مورد")
             }
         }
         item { GoldPrimaryButton("ثبت فاکتور خرید", onClick = onAddPurchase, icon = Icons.Outlined.ShoppingCart) }
@@ -199,6 +205,9 @@ fun PurchaseFormScreen(
             GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
                 Text("مبلغ نهایی فاکتور", color = TextSecondary)
                 MoneyText(total, style = MaterialTheme.typography.headlineMedium)
+                Spacer(Modifier.height(6.dp))
+                Text("تخفیف: ${MoneyFormatter.format(MoneyFormatter.parse(discount))}", color = TextMuted)
+                Text("وضعیت پرداخت: ${paymentType.label()}", color = if (paymentType == PurchasePaymentType.CREDIT) AppOrange else AppGreen)
             }
         }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }

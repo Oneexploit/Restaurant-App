@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.Inventory
 import androidx.compose.material.icons.outlined.Payments
-import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,10 +36,13 @@ import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
 import com.restaurant.offlinemanager.core.design.MoneyText
+import com.restaurant.offlinemanager.core.design.ReportCard
 import com.restaurant.offlinemanager.core.design.SectionHeader
 import com.restaurant.offlinemanager.core.design.StatCard
 import com.restaurant.offlinemanager.core.design.TextPrimary
 import com.restaurant.offlinemanager.core.design.TextSecondary
+import com.restaurant.offlinemanager.core.utils.MoneyFormatter
+import com.restaurant.offlinemanager.core.utils.NumberFormatter
 import com.restaurant.offlinemanager.domain.model.MonthlyPoint
 import com.restaurant.offlinemanager.ui.AppUiState
 import com.restaurant.offlinemanager.ui.CsvReportType
@@ -49,23 +54,27 @@ fun ReportsScreen(
     onExport: (Context, CsvReportType) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val bestProject = state.projectFinances.maxByOrNull { it.totalDelivered }
+    val topDebtorProject = state.projectFinances.maxByOrNull { it.receivable }
+    val topSupplierDebt = state.supplierDebts.maxByOrNull { it.remaining }
+    val lowStock = state.inventory.filter { it.isLowStock }.take(3)
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { SectionHeader("گزارش‌ها") }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard("خرید امروز", com.restaurant.offlinemanager.core.utils.MoneyFormatter.format(state.dashboard.todayPurchasesTotal), Icons.Outlined.ShoppingCart, AppGreen, Modifier.weight(1f))
-                StatCard("ارزش انبار", com.restaurant.offlinemanager.core.utils.MoneyFormatter.format(state.dashboard.totalInventoryValue), Icons.Outlined.Inventory, AppCyan, Modifier.weight(1f))
+                StatCard("خرید امروز", MoneyFormatter.format(state.dashboard.todayPurchasesTotal), Icons.Outlined.ShoppingCart, AppGreen, Modifier.weight(1f))
+                StatCard("ارزش انبار", MoneyFormatter.format(state.dashboard.totalInventoryValue), Icons.Outlined.Inventory, AppCyan, Modifier.weight(1f))
             }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard("مطالبات", com.restaurant.offlinemanager.core.utils.MoneyFormatter.format(state.dashboard.projectReceivablesTotal), Icons.Outlined.ReceiptLong, AppOrange, Modifier.weight(1f))
-                StatCard("بدهی تامین‌کننده", com.restaurant.offlinemanager.core.utils.MoneyFormatter.format(state.dashboard.supplierDebtsTotal), Icons.Outlined.Payments, AppRed, Modifier.weight(1f))
+                StatCard("مطالبات", MoneyFormatter.format(state.dashboard.projectReceivablesTotal), Icons.AutoMirrored.Outlined.ReceiptLong, AppOrange, Modifier.weight(1f))
+                StatCard("بدهی تامین‌کننده", MoneyFormatter.format(state.dashboard.supplierDebtsTotal), Icons.Outlined.Payments, AppRed, Modifier.weight(1f))
             }
         }
         item {
@@ -87,6 +96,39 @@ fun ReportsScreen(
                 Text("خلاصه خروجی‌ها", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
                 Text("فایل‌های CSV در حافظه محلی برنامه ذخیره می‌شوند.", color = TextSecondary)
             }
+        }
+        item { SectionHeader("بینش‌های مدیریتی") }
+        item {
+            ReportCard(
+                title = "بهترین پروژه از نظر درآمد",
+                subtitle = bestProject?.let { "${it.project.name} • ${MoneyFormatter.format(it.totalDelivered)}" } ?: "هنوز درآمد پروژه‌ای ثبت نشده است.",
+                icon = Icons.Outlined.Business,
+                accent = Gold
+            )
+        }
+        item {
+            ReportCard(
+                title = "بدهکارترین پروژه",
+                subtitle = topDebtorProject?.let { "${it.project.name} • ${MoneyFormatter.format(it.receivable.coerceAtLeast(0))}" } ?: "مطالبه فعالی وجود ندارد.",
+                icon = Icons.AutoMirrored.Outlined.ReceiptLong,
+                accent = AppOrange
+            )
+        }
+        item {
+            ReportCard(
+                title = "بیشترین تامین‌کننده بدهکار",
+                subtitle = topSupplierDebt?.let { "${it.supplier.name} • ${MoneyFormatter.format(it.remaining.coerceAtLeast(0))}" } ?: "بدهی تامین‌کننده ثبت نشده است.",
+                icon = Icons.Outlined.Payments,
+                accent = AppRed
+            )
+        }
+        item {
+            ReportCard(
+                title = "اقلام نزدیک به کمبود",
+                subtitle = if (lowStock.isEmpty()) "همه اقلام بالاتر از حداقل موجودی هستند." else lowStock.joinToString("، ") { "${it.materialName} (${NumberFormatter.format(it.quantity)})" },
+                icon = Icons.Outlined.Warning,
+                accent = AppOrange
+            )
         }
         item { GoldPrimaryButton("خروجی خریدها", onClick = { onExport(context, CsvReportType.PURCHASES) }, icon = Icons.Outlined.FileDownload) }
         item { GoldPrimaryButton("خروجی موجودی", onClick = { onExport(context, CsvReportType.INVENTORY) }, icon = Icons.Outlined.FileDownload) }

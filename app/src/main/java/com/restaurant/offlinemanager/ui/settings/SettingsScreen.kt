@@ -22,10 +22,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.restaurant.offlinemanager.core.design.AppLogoMark
+import com.restaurant.offlinemanager.core.design.ConfirmDialog
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
@@ -46,6 +51,7 @@ fun SettingsScreen(
     onRestoreBackup: (Context, Uri) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var confirmRestore by remember { mutableStateOf(false) }
     val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) onRestoreBackup(context, uri)
     }
@@ -53,7 +59,7 @@ fun SettingsScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { SectionHeader("تنظیمات") }
@@ -68,12 +74,19 @@ fun SettingsScreen(
             }
         }
         item {
+            SettingsSection("اطلاعات کسب‌وکار") {
+                Text("مدیریت غذای شرکتی و رستوران آفلاین", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                Text("ساختار داده‌ها محلی است و برای استفاده روزانه بدون اینترنت طراحی شده است.", color = TextSecondary)
+                Text("نام، لوگو و جزئیات رسمی کسب‌وکار می‌تواند در نسخه بعدی قابل ویرایش شود.", color = TextMuted)
+            }
+        }
+        item {
             SettingsSection("پشتیبان‌گیری") {
                 GoldPrimaryButton("خروجی JSON پشتیبان", onClick = { onExportBackup(context) }, icon = Icons.Outlined.FileDownload)
                 Spacer(Modifier.height(10.dp))
                 GoldPrimaryButton(
                     "بازیابی از فایل JSON",
-                    onClick = { restoreLauncher.launch(arrayOf("application/json", "text/*")) },
+                    onClick = { confirmRestore = true },
                     icon = Icons.Outlined.UploadFile
                 )
             }
@@ -100,6 +113,12 @@ fun SettingsScreen(
             }
         }
         item {
+            SettingsSection("خروجی‌ها") {
+                Text("گزارش‌های CSV از بخش گزارش‌ها دریافت می‌شوند.", color = TextSecondary)
+                Text("خروجی خریدها، موجودی، مطالبات، بدهی تامین‌کنندگان و پرداخت‌ها در دسترس است.", color = TextMuted)
+            }
+        }
+        item {
             SettingsSection("اطلاعات برنامه") {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -116,6 +135,18 @@ fun SettingsScreen(
             }
         }
         item { Spacer(Modifier.height(20.dp)) }
+    }
+    if (confirmRestore) {
+        ConfirmDialog(
+            title = "بازیابی پشتیبان",
+            message = "قبل از بازیابی مطمئن شوید فایل درست را انتخاب می‌کنید. اطلاعات فعلی ممکن است با داده‌های فایل جایگزین شود.",
+            confirmText = "انتخاب فایل",
+            onConfirm = {
+                confirmRestore = false
+                restoreLauncher.launch(arrayOf("application/json", "text/*"))
+            },
+            onDismiss = { confirmRestore = false }
+        )
     }
 }
 

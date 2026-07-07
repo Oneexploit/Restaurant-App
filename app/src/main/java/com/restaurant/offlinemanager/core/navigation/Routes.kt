@@ -1,11 +1,11 @@
 package com.restaurant.offlinemanager.core.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Inventory
-import androidx.compose.material.icons.outlined.List
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -50,9 +50,9 @@ data class BottomDestination(
 
 val BottomDestinations = listOf(
     BottomDestination(Routes.Home, "خانه", Icons.Outlined.Home),
-    BottomDestination(Routes.ProjectsList, "پروژه‌ها", Icons.Outlined.List),
+    BottomDestination(Routes.ProjectsList, "پروژه‌ها", Icons.AutoMirrored.Outlined.List),
     BottomDestination(Routes.WarehousesList, "انبار", Icons.Outlined.Inventory),
-    BottomDestination(Routes.PurchasesList, "خرید روزانه", Icons.Outlined.ShoppingCart),
+    BottomDestination(Routes.PurchasesList, "خرید", Icons.Outlined.ShoppingCart),
     BottomDestination(Routes.FinanceDashboard, "مالی", Icons.Outlined.AccountBalanceWallet),
     BottomDestination(Routes.Reports, "گزارش‌ها", Icons.Outlined.BarChart)
 )
