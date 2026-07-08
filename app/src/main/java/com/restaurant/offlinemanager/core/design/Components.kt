@@ -1,11 +1,31 @@
 package com.restaurant.offlinemanager.core.design
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,8 +37,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -63,6 +85,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,8 +94,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -84,6 +109,125 @@ import com.restaurant.offlinemanager.core.navigation.BottomDestination
 import com.restaurant.offlinemanager.core.utils.MoneyFormatter
 import com.restaurant.offlinemanager.core.utils.NumberFormatter
 import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
+
+private data class PressMotion(
+    val interactionSource: MutableInteractionSource,
+    val modifier: Modifier
+)
+
+@Composable
+private fun rememberPressMotion(
+    enabled: Boolean = true,
+    pressedScale: Float = 0.97f
+): PressMotion {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (enabled && pressed) pressedScale else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "pressScale"
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (enabled) 1f else 0.56f,
+        animationSpec = tween(180),
+        label = "pressAlpha"
+    )
+    return PressMotion(
+        interactionSource = interactionSource,
+        modifier = Modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+            this.alpha = alpha
+        }
+    )
+}
+
+@Composable
+private fun Modifier.cardEntrance(): Modifier {
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        entered = true
+    }
+    val alpha by animateFloatAsState(
+        targetValue = if (entered) 1f else 0f,
+        animationSpec = tween(durationMillis = 260),
+        label = "cardAlpha"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (entered) 1f else 0.985f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "cardScale"
+    )
+    return graphicsLayer {
+        this.alpha = alpha
+        scaleX = scale
+        scaleY = scale
+    }
+}
+
+@Composable
+private fun AnimatedPremiumBackdrop(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "premiumBackdrop")
+    val drift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 12000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "backdropDrift"
+    )
+    val glow by transition.animateFloat(
+        initialValue = 0.55f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 6800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "backdropGlow"
+    )
+    Canvas(modifier = modifier.fillMaxSize()) {
+        drawRect(
+            brush = Brush.verticalGradient(
+                listOf(
+                    BackgroundStart,
+                    BackgroundMid,
+                    BackgroundEnd
+                )
+            )
+        )
+        drawRect(
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    AppCyan.copy(alpha = 0.055f * glow),
+                    Color.Transparent,
+                    Gold.copy(alpha = 0.045f * glow),
+                    Color.Transparent
+                ),
+                start = Offset(size.width * (-0.35f + drift * 0.35f), 0f),
+                end = Offset(size.width * (0.55f + drift * 0.45f), size.height)
+            )
+        )
+        drawRect(
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    AppPurple.copy(alpha = 0.04f * glow),
+                    Color.Transparent
+                ),
+                start = Offset(size.width, size.height * (0.08f + drift * 0.14f)),
+                end = Offset(0f, size.height * (0.78f + drift * 0.08f))
+            )
+        )
+    }
+}
 
 @Composable
 fun AppScaffold(
@@ -128,32 +272,35 @@ fun PremiumScaffold(
     floatingAction: (@Composable () -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit
 ) {
-    Scaffold(
-        modifier = modifier.appBackground(),
-        containerColor = Color.Transparent,
-        topBar = {
-            PremiumTopBar(
-                title = title,
-                onOpenSettings = onOpenSettings,
-                onOpenSearch = onOpenSearch,
-                onBack = onBack
-            )
-        },
-        bottomBar = {
-            PremiumBottomNavigation(
-                destinations = bottomDestinations,
-                currentRoute = currentRoute,
-                onNavigate = onNavigate
-            )
-        },
-        snackbarHost = {
-            if (snackbarHostState != null) {
-                SnackbarHost(snackbarHostState)
-            }
-        },
-        floatingActionButton = { floatingAction?.invoke() },
-        content = content
-    )
+    Box(modifier = modifier.fillMaxSize()) {
+        AnimatedPremiumBackdrop()
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent,
+            topBar = {
+                PremiumTopBar(
+                    title = title,
+                    onOpenSettings = onOpenSettings,
+                    onOpenSearch = onOpenSearch,
+                    onBack = onBack
+                )
+            },
+            bottomBar = {
+                PremiumBottomNavigation(
+                    destinations = bottomDestinations,
+                    currentRoute = currentRoute,
+                    onNavigate = onNavigate
+                )
+            },
+            snackbarHost = {
+                if (snackbarHostState != null) {
+                    SnackbarHost(snackbarHostState)
+                }
+            },
+            floatingActionButton = { floatingAction?.invoke() },
+            content = content
+        )
+    }
 }
 
 @Composable
@@ -164,8 +311,8 @@ fun PremiumBackground(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(premiumBackgroundBrush())
     ) {
+        AnimatedPremiumBackdrop()
         content()
     }
 }
@@ -179,6 +326,40 @@ fun AppTopBar(
 ) = PremiumTopBar(title, onOpenSettings, onOpenSearch, onBack)
 
 @Composable
+private fun TopBarIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    tint: Color = TextPrimary
+) {
+    val motion = rememberPressMotion()
+    val shape = RoundedCornerShape(16.dp)
+    Box(
+        modifier = Modifier
+            .size(AppDimens.MinimumTouchTarget)
+            .then(motion.modifier)
+            .clip(shape)
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        SurfaceGlassStrong.copy(alpha = 0.72f),
+                        SurfaceGlass.copy(alpha = 0.45f)
+                    )
+                )
+            )
+            .border(1.dp, BorderSoft.copy(alpha = 0.68f), shape)
+            .clickable(
+                interactionSource = motion.interactionSource,
+                indication = LocalIndication.current,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = contentDescription, tint = tint)
+    }
+}
+
+@Composable
 fun PremiumTopBar(
     title: String,
     onOpenSettings: () -> Unit,
@@ -188,25 +369,30 @@ fun PremiumTopBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .statusBarsPadding()
             .padding(horizontal = AppDimens.ScreenPadding, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (onBack != null) {
-            IconButton(onClick = onBack, modifier = Modifier.size(AppDimens.MinimumTouchTarget)) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "بازگشت", tint = TextPrimary)
-            }
+            TopBarIconButton(Icons.AutoMirrored.Outlined.ArrowBack, "بازگشت", onBack)
         } else {
             AppLogoMark(modifier = Modifier.size(46.dp))
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                color = TextPrimary,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            AnimatedContent(
+                targetState = title,
+                transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
+                label = "topBarTitle"
+            ) { currentTitle ->
+                Text(
+                    text = currentTitle,
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             Text(
                 text = PersianDateFormatter.formatLong(PersianDateFormatter.nowMillis()),
                 color = TextSecondary,
@@ -215,12 +401,9 @@ fun PremiumTopBar(
                 overflow = TextOverflow.Ellipsis
             )
         }
-        IconButton(onClick = onOpenSearch, modifier = Modifier.size(AppDimens.MinimumTouchTarget)) {
-            Icon(Icons.Outlined.Search, contentDescription = "جستجو", tint = TextSecondary)
-        }
-        IconButton(onClick = onOpenSettings, modifier = Modifier.size(AppDimens.MinimumTouchTarget)) {
-            Icon(Icons.Outlined.Menu, contentDescription = "منو", tint = TextPrimary)
-        }
+        TopBarIconButton(Icons.Outlined.Search, "جستجو", onOpenSearch, tint = TextSecondary)
+        Spacer(Modifier.width(8.dp))
+        TopBarIconButton(Icons.Outlined.Menu, "منو", onOpenSettings)
     }
 }
 
@@ -230,15 +413,29 @@ fun AppLogoMark(
     showGlow: Boolean = true
 ) {
     val shape = RoundedCornerShape(18.dp)
+    val transition = rememberInfiniteTransition(label = "logoPulse")
+    val pulse by transition.animateFloat(
+        initialValue = 0.96f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "logoPulseScale"
+    )
     Box(
         modifier = modifier
+            .graphicsLayer {
+                scaleX = if (showGlow) pulse else 1f
+                scaleY = if (showGlow) pulse else 1f
+            }
             .then(
                 if (showGlow) {
                     Modifier.shadow(
-                        elevation = 14.dp,
+                        elevation = (14f * pulse).dp,
                         shape = shape,
-                        ambientColor = Gold.copy(alpha = 0.22f),
-                        spotColor = Gold.copy(alpha = 0.28f)
+                        ambientColor = Gold.copy(alpha = 0.24f),
+                        spotColor = AppCyan.copy(alpha = 0.18f)
                     )
                 } else {
                     Modifier
@@ -267,25 +464,27 @@ fun GlassCard(
 ) {
     val shape = RoundedCornerShape(AppDimens.CardRadius)
     Card(
-        modifier = modifier.shadow(
-            elevation = 16.dp,
-            shape = shape,
-            ambientColor = Color.Black.copy(alpha = 0.34f),
-            spotColor = (accent ?: Gold).copy(alpha = 0.12f)
-        ),
+        modifier = modifier
+            .cardEntrance()
+            .shadow(
+                elevation = 18.dp,
+                shape = shape,
+                ambientColor = Color.Black.copy(alpha = 0.36f),
+                spotColor = (accent ?: Gold).copy(alpha = 0.16f)
+            ),
         shape = shape,
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         border = BorderStroke(1.dp, (accent ?: BorderSoft).copy(alpha = if (accent == null) 0.72f else 0.55f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            SurfaceGlass.copy(alpha = 0.98f),
-                            SurfaceGlassStrong.copy(alpha = 0.9f),
-                            BackgroundStart.copy(alpha = 0.32f)
+                            SurfaceGlass.copy(alpha = 0.97f),
+                            SurfaceGlassStrong.copy(alpha = 0.91f),
+                            BackgroundStart.copy(alpha = 0.38f)
                         )
                     )
                 )
@@ -298,9 +497,27 @@ fun GlassCard(
                         )
                     )
                 )
-                .padding(contentPadding),
-            content = content
-        )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                Color.Transparent,
+                                (accent ?: Gold).copy(alpha = 0.72f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+                    .align(Alignment.TopCenter)
+            )
+            Column(
+                modifier = Modifier.padding(contentPadding),
+                content = content
+            )
+        }
     }
 }
 
@@ -338,13 +555,19 @@ fun StatCard(
             IconBubble(icon = icon, accent = accent)
             Column {
                 Text(title, color = TextSecondary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(
-                    value,
-                    color = TextPrimary,
-                    style = MaterialTheme.typography.headlineSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                AnimatedContent(
+                    targetState = value,
+                    transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
+                    label = "statValue"
+                ) { targetValue ->
+                    Text(
+                        targetValue,
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.headlineSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 if (subtitle != null) {
                     Text(subtitle, color = TextMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1)
                 }
@@ -370,7 +593,13 @@ fun MiniStatCard(
             if (icon != null) IconBubble(icon = icon, accent = accent, size = 34.dp)
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, color = TextSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                Text(value, color = TextPrimary, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                AnimatedContent(
+                    targetState = value,
+                    transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(110)) },
+                    label = "miniStatValue"
+                ) { targetValue ->
+                    Text(targetValue, color = TextPrimary, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }
@@ -385,10 +614,16 @@ fun ActionCard(
     modifier: Modifier = Modifier,
     subtitle: String? = null
 ) {
+    val motion = rememberPressMotion(pressedScale = 0.965f)
     GlassCard(
         modifier = modifier
             .heightIn(min = 86.dp)
-            .clickable(onClick = onClick),
+            .then(motion.modifier)
+            .clickable(
+                interactionSource = motion.interactionSource,
+                indication = LocalIndication.current,
+                onClick = onClick
+            ),
         accent = accent,
         contentPadding = PaddingValues(14.dp)
     ) {
@@ -407,11 +642,25 @@ private fun IconBubble(
     accent: Color,
     size: androidx.compose.ui.unit.Dp = 40.dp
 ) {
+    val transition = rememberInfiniteTransition(label = "iconBubble")
+    val pulse by transition.animateFloat(
+        initialValue = 0.92f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2400, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "iconBubblePulse"
+    )
     Box(
         modifier = Modifier
             .size(size)
+            .graphicsLayer {
+                scaleX = 0.98f + (pulse * 0.02f)
+                scaleY = 0.98f + (pulse * 0.02f)
+            }
             .clip(RoundedCornerShape(14.dp))
-            .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.28f), accent.copy(alpha = 0.08f)))),
+            .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.30f * pulse), accent.copy(alpha = 0.08f)))),
         contentAlignment = Alignment.Center
     ) {
         Icon(icon, contentDescription = null, tint = accent)
@@ -427,10 +676,22 @@ fun GoldPrimaryButton(
     enabled: Boolean = true
 ) {
     val shape = RoundedCornerShape(AppDimens.ButtonRadius)
+    val motion = rememberPressMotion(enabled = enabled, pressedScale = 0.965f)
+    val shimmer = rememberInfiniteTransition(label = "primaryButtonShimmer")
+    val shimmerProgress by shimmer.animateFloat(
+        initialValue = -0.65f,
+        targetValue = 1.65f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "buttonShimmerProgress"
+    )
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(AppDimens.ButtonHeight)
+            .then(motion.modifier)
             .shadow(14.dp, shape, ambientColor = Gold.copy(alpha = 0.18f), spotColor = Gold.copy(alpha = 0.18f))
             .clip(shape)
             .background(
@@ -438,9 +699,30 @@ fun GoldPrimaryButton(
                 else Brush.verticalGradient(listOf(BorderSoft, SurfaceGlassStrong))
             )
             .border(1.dp, Color.White.copy(alpha = if (enabled) 0.18f else 0.06f), shape)
-            .clickable(enabled = enabled, onClick = onClick),
+            .clickable(
+                interactionSource = motion.interactionSource,
+                indication = LocalIndication.current,
+                enabled = enabled,
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
+        if (enabled) {
+            Canvas(modifier = Modifier.matchParentSize()) {
+                val x = size.width * shimmerProgress
+                drawRect(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.22f),
+                            Color.Transparent
+                        ),
+                        start = Offset(x, 0f),
+                        end = Offset(x + size.width * 0.32f, size.height)
+                    )
+                )
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
             Icon(icon, contentDescription = null, tint = if (enabled) BackgroundStart else TextMuted)
             Spacer(Modifier.width(8.dp))
@@ -458,14 +740,28 @@ fun SecondaryGlassButton(
     accent: Color = Gold
 ) {
     val shape = RoundedCornerShape(AppDimens.ButtonRadius)
+    val motion = rememberPressMotion(pressedScale = 0.97f)
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(AppDimens.ButtonHeight)
+            .then(motion.modifier)
             .clip(shape)
-            .background(SurfaceGlassStrong)
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        SurfaceGlassStrong,
+                        accent.copy(alpha = 0.12f),
+                        SurfaceGlass.copy(alpha = 0.82f)
+                    )
+                )
+            )
             .border(1.dp, accent.copy(alpha = 0.36f), shape)
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = motion.interactionSource,
+                indication = LocalIndication.current,
+                onClick = onClick
+            )
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
@@ -502,11 +798,24 @@ fun DarkOutlinedTextField(
     supportingText: String? = null,
     trailingIcon: (@Composable () -> Unit)? = null
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+    val focusElevation by animateDpAsState(
+        targetValue = if (focused || isError) 8.dp else 0.dp,
+        animationSpec = tween(180),
+        label = "fieldElevation"
+    )
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier
             .fillMaxWidth()
+            .shadow(
+                elevation = focusElevation,
+                shape = RoundedCornerShape(AppDimens.SmallRadius),
+                ambientColor = if (isError) AppRed.copy(alpha = 0.16f) else Gold.copy(alpha = 0.14f),
+                spotColor = if (isError) AppRed.copy(alpha = 0.14f) else AppCyan.copy(alpha = 0.10f)
+            )
             .heightIn(min = AppDimens.InputHeight),
         label = { Text(label) },
         singleLine = singleLine,
@@ -514,6 +823,7 @@ fun DarkOutlinedTextField(
         isError = isError,
         supportingText = supportingText?.let { text -> { Text(text) } },
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        interactionSource = interactionSource,
         trailingIcon = trailingIcon,
         shape = RoundedCornerShape(AppDimens.SmallRadius),
         colors = TextFieldDefaults.colors(
@@ -568,7 +878,9 @@ fun PremiumBottomNavigation(
 ) {
     NavigationBar(
         modifier = Modifier
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp)
+            .navigationBarsPadding()
+            .padding(top = 8.dp, bottom = 8.dp)
             .heightIn(min = AppDimens.BottomNavHeight)
             .shadow(18.dp, RoundedCornerShape(AppDimens.BottomNavRadius), ambientColor = Color.Black.copy(alpha = 0.45f), spotColor = Gold.copy(alpha = 0.1f))
             .clip(RoundedCornerShape(AppDimens.BottomNavRadius))
@@ -579,11 +891,34 @@ fun PremiumBottomNavigation(
     ) {
         destinations.forEach { destination ->
             val selected = currentRoute == destination.route
+            val iconScale by animateFloatAsState(
+                targetValue = if (selected) 1.16f else 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                ),
+                label = "bottomIconScale"
+            )
+            val iconColor by animateColorAsState(
+                targetValue = if (selected) Gold else TextMuted,
+                animationSpec = tween(220),
+                label = "bottomIconColor"
+            )
             NavigationBarItem(
                 selected = selected,
                 onClick = { onNavigate(destination.route) },
-                alwaysShowLabel = false,
-                icon = { Icon(destination.icon, contentDescription = destination.label) },
+                alwaysShowLabel = selected,
+                icon = {
+                    Icon(
+                        destination.icon,
+                        contentDescription = destination.label,
+                        tint = iconColor,
+                        modifier = Modifier.graphicsLayer {
+                            scaleX = iconScale
+                            scaleY = iconScale
+                        }
+                    )
+                },
                 label = {
                     Text(
                         destination.label,
@@ -610,18 +945,23 @@ fun StatusChip(
     color: Color,
     modifier: Modifier = Modifier
 ) {
+    val chipColor by animateColorAsState(
+        targetValue = color,
+        animationSpec = tween(220),
+        label = "chipColor"
+    )
     Box(
         modifier = modifier
             .heightIn(min = 34.dp)
             .clip(RoundedCornerShape(18.dp))
-            .background(color.copy(alpha = 0.14f))
-            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
+            .background(chipColor.copy(alpha = 0.14f))
+            .border(1.dp, chipColor.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
             .padding(horizontal = 11.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             label,
-            color = color,
+            color = chipColor,
             style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -636,14 +976,20 @@ fun MoneyText(
     color: Color = Gold,
     style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.titleLarge
 ) {
-    Text(
-        text = MoneyFormatter.format(amount),
+    AnimatedContent(
+        targetState = amount,
         modifier = modifier,
-        color = color,
-        style = style,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
-    )
+        transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
+        label = "moneyText"
+    ) { targetAmount ->
+        Text(
+            text = MoneyFormatter.format(targetAmount),
+            color = color,
+            style = style,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
 
 @Composable
@@ -966,9 +1312,22 @@ fun FilterChipRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         options.forEach { option ->
+            val isSelected = selected == option
+            val chipScale by animateFloatAsState(
+                targetValue = if (isSelected) 1f else 0.96f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                ),
+                label = "filterChipScale"
+            )
             FilterChip(
-                selected = selected == option,
+                selected = isSelected,
                 onClick = { onSelected(option) },
+                modifier = Modifier.graphicsLayer {
+                    scaleX = chipScale
+                    scaleY = chipScale
+                },
                 label = { Text(option, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = Gold.copy(alpha = 0.18f),
@@ -978,7 +1337,7 @@ fun FilterChipRow(
                 ),
                 border = FilterChipDefaults.filterChipBorder(
                     enabled = true,
-                    selected = selected == option,
+                    selected = isSelected,
                     borderColor = BorderSoft,
                     selectedBorderColor = Gold.copy(alpha = 0.55f)
                 )
@@ -1016,6 +1375,11 @@ fun <T> AppDropdownField(
     onSelected: (T) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val arrowRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = tween(180),
+        label = "dropdownArrowRotation"
+    )
     Box(modifier = modifier.fillMaxWidth()) {
         DarkOutlinedTextField(
             value = selected?.let(optionLabel).orEmpty(),
@@ -1023,7 +1387,12 @@ fun <T> AppDropdownField(
             label = label,
             readOnly = true,
             trailingIcon = {
-                Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, tint = TextMuted)
+                Icon(
+                    Icons.Outlined.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = TextMuted,
+                    modifier = Modifier.graphicsLayer { rotationZ = arrowRotation }
+                )
             }
         )
         Box(
@@ -1058,10 +1427,21 @@ fun LowStockWarningCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null
 ) {
+    val motion = rememberPressMotion(enabled = onClick != null, pressedScale = 0.985f)
     GlassCard(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+            .then(
+                if (onClick != null) {
+                    motion.modifier.clickable(
+                        interactionSource = motion.interactionSource,
+                        indication = LocalIndication.current,
+                        onClick = onClick
+                    )
+                } else {
+                    Modifier
+                }
+            ),
         accent = AppOrange
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1115,10 +1495,21 @@ fun ProjectCard(
     onClick: (() -> Unit)? = null,
     actions: @Composable ColumnScope.() -> Unit = {}
 ) {
+    val motion = rememberPressMotion(enabled = onClick != null, pressedScale = 0.985f)
     GlassCard(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+            .then(
+                if (onClick != null) {
+                    motion.modifier.clickable(
+                        interactionSource = motion.interactionSource,
+                        indication = LocalIndication.current,
+                        onClick = onClick
+                    )
+                } else {
+                    Modifier
+                }
+            ),
         accent = statusColor
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1221,10 +1612,21 @@ fun ReportCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null
 ) {
+    val motion = rememberPressMotion(enabled = onClick != null, pressedScale = 0.985f)
     GlassCard(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+            .then(
+                if (onClick != null) {
+                    motion.modifier.clickable(
+                        interactionSource = motion.interactionSource,
+                        indication = LocalIndication.current,
+                        onClick = onClick
+                    )
+                } else {
+                    Modifier
+                }
+            ),
         accent = accent
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

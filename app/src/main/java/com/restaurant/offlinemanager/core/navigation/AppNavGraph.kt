@@ -1,5 +1,10 @@
 package com.restaurant.offlinemanager.core.navigation
 
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -75,7 +80,19 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
         NavHost(
             navController = navController,
             startDestination = Routes.Home,
-            modifier = Modifier.padding(padding)
+            modifier = Modifier.padding(padding),
+            enterTransition = {
+                fadeIn(tween(220)) + slideInHorizontally(tween(320)) { it / 6 }
+            },
+            exitTransition = {
+                fadeOut(tween(160)) + slideOutHorizontally(tween(240)) { -it / 10 }
+            },
+            popEnterTransition = {
+                fadeIn(tween(220)) + slideInHorizontally(tween(320)) { -it / 6 }
+            },
+            popExitTransition = {
+                fadeOut(tween(160)) + slideOutHorizontally(tween(240)) { it / 10 }
+            }
         ) {
             composable(Routes.Home) {
                 HomeScreen(
