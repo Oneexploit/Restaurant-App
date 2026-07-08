@@ -1,6 +1,8 @@
 package com.restaurant.offlinemanager.ui.reports
 
 import android.content.Context
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +24,11 @@ import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -36,6 +43,7 @@ import com.restaurant.offlinemanager.core.design.AppRed
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
+import com.restaurant.offlinemanager.core.design.LocalMotionEnabled
 import com.restaurant.offlinemanager.core.design.MoneyText
 import com.restaurant.offlinemanager.core.design.ReportCard
 import com.restaurant.offlinemanager.core.design.SectionHeader
@@ -151,6 +159,14 @@ private fun MonthlyBars(
         Text("داده‌ای برای نمودار وجود ندارد", color = TextSecondary)
         return
     }
+    val motionEnabled = LocalMotionEnabled.current
+    var entered by remember(points) { mutableStateOf(false) }
+    LaunchedEffect(points) { entered = true }
+    val reveal by animateFloatAsState(
+        targetValue = if (motionEnabled && entered) 1f else if (motionEnabled) 0f else 1f,
+        animationSpec = tween(720),
+        label = "monthlyBarsReveal"
+    )
     val max = points.maxOfOrNull(valueSelector)?.coerceAtLeast(1L) ?: 1L
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Canvas(
@@ -160,12 +176,21 @@ private fun MonthlyBars(
         ) {
             val spacing = 10.dp.toPx()
             val barWidth = (size.width - spacing * (points.size + 1)) / points.size.coerceAtLeast(1)
+            repeat(4) { step ->
+                val y = size.height * (step + 1) / 5f
+                drawLine(
+                    color = TextSecondary.copy(alpha = 0.12f),
+                    start = Offset(0f, y),
+                    end = Offset(size.width, y),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
             points.forEachIndexed { index, point ->
                 val value = valueSelector(point).toFloat() / max.toFloat()
-                val height = size.height * value
+                val height = size.height * value * reveal
                 val x = spacing + index * (barWidth + spacing)
                 drawRoundRect(
-                    color = color,
+                    color = color.copy(alpha = 0.92f),
                     topLeft = Offset(x, size.height - height),
                     size = Size(barWidth, height),
                     cornerRadius = CornerRadius(8.dp.toPx(), 8.dp.toPx())
@@ -186,6 +211,14 @@ private fun IncomeExpenseChart(points: List<MonthlyPoint>) {
         Text("داده‌ای برای نمودار وجود ندارد", color = TextSecondary)
         return
     }
+    val motionEnabled = LocalMotionEnabled.current
+    var entered by remember(points) { mutableStateOf(false) }
+    LaunchedEffect(points) { entered = true }
+    val reveal by animateFloatAsState(
+        targetValue = if (motionEnabled && entered) 1f else if (motionEnabled) 0f else 1f,
+        animationSpec = tween(760),
+        label = "incomeExpenseReveal"
+    )
     val max = points.flatMap { listOf(it.income, it.expense) }.maxOrNull()?.coerceAtLeast(1L) ?: 1L
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Canvas(
@@ -196,12 +229,21 @@ private fun IncomeExpenseChart(points: List<MonthlyPoint>) {
             val spacing = 12.dp.toPx()
             val groupWidth = (size.width - spacing * (points.size + 1)) / points.size.coerceAtLeast(1)
             val barWidth = groupWidth / 2.4f
+            repeat(4) { step ->
+                val y = size.height * (step + 1) / 5f
+                drawLine(
+                    color = TextSecondary.copy(alpha = 0.12f),
+                    start = Offset(0f, y),
+                    end = Offset(size.width, y),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
             points.forEachIndexed { index, point ->
                 val x = spacing + index * (groupWidth + spacing)
-                val incomeHeight = size.height * (point.income.toFloat() / max.toFloat())
-                val expenseHeight = size.height * (point.expense.toFloat() / max.toFloat())
-                drawRoundRect(Gold, Offset(x, size.height - incomeHeight), Size(barWidth, incomeHeight), CornerRadius(8.dp.toPx()))
-                drawRoundRect(AppRed, Offset(x + barWidth + 4.dp.toPx(), size.height - expenseHeight), Size(barWidth, expenseHeight), CornerRadius(8.dp.toPx()))
+                val incomeHeight = size.height * (point.income.toFloat() / max.toFloat()) * reveal
+                val expenseHeight = size.height * (point.expense.toFloat() / max.toFloat()) * reveal
+                drawRoundRect(Gold.copy(alpha = 0.95f), Offset(x, size.height - incomeHeight), Size(barWidth, incomeHeight), CornerRadius(8.dp.toPx()))
+                drawRoundRect(AppRed.copy(alpha = 0.9f), Offset(x + barWidth + 4.dp.toPx(), size.height - expenseHeight), Size(barWidth, expenseHeight), CornerRadius(8.dp.toPx()))
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

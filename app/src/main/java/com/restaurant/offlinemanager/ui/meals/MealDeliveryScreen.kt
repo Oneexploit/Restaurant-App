@@ -31,6 +31,7 @@ import com.restaurant.offlinemanager.core.design.DangerButton
 import com.restaurant.offlinemanager.core.design.DarkOutlinedTextField
 import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.FilterChipRow
+import com.restaurant.offlinemanager.core.design.FormActionFooter
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
@@ -206,7 +207,7 @@ fun MealDeliveryFormScreen(
         }
         if (error != null) item { Text(error.orEmpty(), color = com.restaurant.offlinemanager.core.design.AppRed) }
         item {
-            GoldPrimaryButton(
+            FormActionFooter(
                 text = "ثبت وعده",
                 icon = Icons.Outlined.Save,
                 enabled = setupReady,

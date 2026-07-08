@@ -45,6 +45,7 @@ fun SettingsScreen(
     state: AppUiState,
     context: Context,
     onLowStockNotifications: (Boolean) -> Unit,
+    onReducedMotion: (Boolean) -> Unit,
     onExportBackup: (Context) -> Unit,
     onRestoreBackup: (Context, Uri) -> Unit,
     modifier: Modifier = Modifier
@@ -92,6 +93,16 @@ fun SettingsScreen(
                     subtitle = "اقلام زیر حداقل موجودی در داشبورد نمایش داده می‌شوند.",
                     checked = state.settings.lowStockNotificationsEnabled,
                     onCheckedChange = onLowStockNotifications
+                )
+            }
+        }
+        item {
+            SettingsSection("نمایش و حرکت") {
+                SettingSwitch(
+                    title = "کاهش انیمیشن‌ها",
+                    subtitle = "برای استفاده طولانی یا دستگاه‌های ضعیف، حرکت‌های تزئینی کم می‌شود.",
+                    checked = state.settings.reducedMotionEnabled,
+                    onCheckedChange = onReducedMotion
                 )
             }
         }

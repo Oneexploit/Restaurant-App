@@ -50,6 +50,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Business
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.FileDownload
@@ -85,6 +86,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -120,10 +122,11 @@ private fun rememberPressMotion(
     enabled: Boolean = true,
     pressedScale: Float = 0.97f
 ): PressMotion {
+    val motionEnabled = LocalMotionEnabled.current
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (enabled && pressed) pressedScale else 1f,
+        targetValue = if (motionEnabled && enabled && pressed) pressedScale else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMediumLow
@@ -147,6 +150,8 @@ private fun rememberPressMotion(
 
 @Composable
 private fun Modifier.cardEntrance(): Modifier {
+    val motionEnabled = LocalMotionEnabled.current
+    if (!motionEnabled) return this
     var entered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         entered = true
@@ -173,6 +178,34 @@ private fun Modifier.cardEntrance(): Modifier {
 
 @Composable
 private fun AnimatedPremiumBackdrop(modifier: Modifier = Modifier) {
+    val motionEnabled = LocalMotionEnabled.current
+    if (!motionEnabled) {
+        Canvas(modifier = modifier.fillMaxSize()) {
+            drawRect(
+                brush = Brush.verticalGradient(
+                    listOf(
+                        BackgroundStart,
+                        BackgroundMid,
+                        BackgroundEnd
+                    )
+                )
+            )
+            drawRect(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        AppCyan.copy(alpha = 0.035f),
+                        Color.Transparent,
+                        Gold.copy(alpha = 0.03f),
+                        Color.Transparent
+                    ),
+                    start = Offset(0f, 0f),
+                    end = Offset(size.width, size.height)
+                )
+            )
+        }
+        return
+    }
     val transition = rememberInfiniteTransition(label = "premiumBackdrop")
     val drift by transition.animateFloat(
         initialValue = 0f,
@@ -240,6 +273,7 @@ fun AppScaffold(
     onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState? = null,
+    motionEnabled: Boolean = true,
     floatingAction: (@Composable () -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit
 ) {
@@ -253,6 +287,7 @@ fun AppScaffold(
         onBack = onBack,
         modifier = modifier,
         snackbarHostState = snackbarHostState,
+        motionEnabled = motionEnabled,
         floatingAction = floatingAction,
         content = content
     )
@@ -269,37 +304,82 @@ fun PremiumScaffold(
     onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState? = null,
+    motionEnabled: Boolean = true,
     floatingAction: (@Composable () -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
-        AnimatedPremiumBackdrop()
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            containerColor = Color.Transparent,
-            topBar = {
-                PremiumTopBar(
-                    title = title,
-                    onOpenSettings = onOpenSettings,
-                    onOpenSearch = onOpenSearch,
-                    onBack = onBack
+    CompositionLocalProvider(LocalMotionEnabled provides motionEnabled) {
+        Box(modifier = modifier.fillMaxSize()) {
+            AnimatedPremiumBackdrop()
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                containerColor = Color.Transparent,
+                topBar = {
+                    PremiumTopBar(
+                        title = title,
+                        onOpenSettings = onOpenSettings,
+                        onOpenSearch = onOpenSearch,
+                        onBack = onBack
+                    )
+                },
+                bottomBar = {
+                    PremiumBottomNavigation(
+                        destinations = bottomDestinations,
+                        currentRoute = currentRoute,
+                        onNavigate = onNavigate
+                    )
+                },
+                snackbarHost = {
+                    if (snackbarHostState != null) {
+                        PremiumSnackbarHost(snackbarHostState)
+                    }
+                },
+                floatingActionButton = { floatingAction?.invoke() },
+                content = content
+            )
+        }
+    }
+}
+
+@Composable
+private fun PremiumSnackbarHost(snackbarHostState: SnackbarHostState) {
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+    ) { data ->
+        val message = data.visuals.message
+        val isError = listOf("خطا", "نامعتبر", "نمی‌تواند", "الزامی", "کافی نیست").any { message.contains(it) }
+        val isDelete = listOf("حذف", "آرشیو").any { message.contains(it) }
+        val accent = when {
+            isError || isDelete -> AppRed
+            listOf("ذخیره", "ثبت", "انجام", "فعال", "خروجی", "بازیابی").any { message.contains(it) } -> AppGreen
+            else -> Gold
+        }
+        val icon = when {
+            isError -> Icons.Outlined.ErrorOutline
+            isDelete -> Icons.Outlined.Warning
+            else -> Icons.Outlined.CheckCircle
+        }
+        GlassCard(
+            modifier = Modifier.fillMaxWidth(),
+            accent = accent,
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(icon, contentDescription = null, tint = accent)
+                Text(
+                    text = message,
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
                 )
-            },
-            bottomBar = {
-                PremiumBottomNavigation(
-                    destinations = bottomDestinations,
-                    currentRoute = currentRoute,
-                    onNavigate = onNavigate
-                )
-            },
-            snackbarHost = {
-                if (snackbarHostState != null) {
-                    SnackbarHost(snackbarHostState)
-                }
-            },
-            floatingActionButton = { floatingAction?.invoke() },
-            content = content
-        )
+            }
+        }
     }
 }
 
@@ -412,6 +492,7 @@ fun AppLogoMark(
     modifier: Modifier = Modifier,
     showGlow: Boolean = true
 ) {
+    val motionEnabled = LocalMotionEnabled.current
     val shape = RoundedCornerShape(18.dp)
     val transition = rememberInfiniteTransition(label = "logoPulse")
     val pulse by transition.animateFloat(
@@ -426,13 +507,14 @@ fun AppLogoMark(
     Box(
         modifier = modifier
             .graphicsLayer {
-                scaleX = if (showGlow) pulse else 1f
-                scaleY = if (showGlow) pulse else 1f
+                val animatedPulse = if (showGlow && motionEnabled) pulse else 1f
+                scaleX = animatedPulse
+                scaleY = animatedPulse
             }
             .then(
                 if (showGlow) {
                     Modifier.shadow(
-                        elevation = (14f * pulse).dp,
+                        elevation = (14f * (if (motionEnabled) pulse else 1f)).dp,
                         shape = shape,
                         ambientColor = Gold.copy(alpha = 0.24f),
                         spotColor = AppCyan.copy(alpha = 0.18f)
@@ -642,6 +724,7 @@ private fun IconBubble(
     accent: Color,
     size: androidx.compose.ui.unit.Dp = 40.dp
 ) {
+    val motionEnabled = LocalMotionEnabled.current
     val transition = rememberInfiniteTransition(label = "iconBubble")
     val pulse by transition.animateFloat(
         initialValue = 0.92f,
@@ -656,11 +739,12 @@ private fun IconBubble(
         modifier = Modifier
             .size(size)
             .graphicsLayer {
-                scaleX = 0.98f + (pulse * 0.02f)
-                scaleY = 0.98f + (pulse * 0.02f)
+                val animatedPulse = if (motionEnabled) pulse else 1f
+                scaleX = 0.98f + (animatedPulse * 0.02f)
+                scaleY = 0.98f + (animatedPulse * 0.02f)
             }
             .clip(RoundedCornerShape(14.dp))
-            .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.30f * pulse), accent.copy(alpha = 0.08f)))),
+            .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.30f * (if (motionEnabled) pulse else 1f)), accent.copy(alpha = 0.08f)))),
         contentAlignment = Alignment.Center
     ) {
         Icon(icon, contentDescription = null, tint = accent)
@@ -675,6 +759,7 @@ fun GoldPrimaryButton(
     icon: ImageVector = Icons.Outlined.Add,
     enabled: Boolean = true
 ) {
+    val motionEnabled = LocalMotionEnabled.current
     val shape = RoundedCornerShape(AppDimens.ButtonRadius)
     val motion = rememberPressMotion(enabled = enabled, pressedScale = 0.965f)
     val shimmer = rememberInfiniteTransition(label = "primaryButtonShimmer")
@@ -707,7 +792,7 @@ fun GoldPrimaryButton(
             ),
         contentAlignment = Alignment.Center
     ) {
-        if (enabled) {
+        if (enabled && motionEnabled) {
             Canvas(modifier = Modifier.matchParentSize()) {
                 val x = size.width * shimmerProgress
                 drawRect(
@@ -782,6 +867,29 @@ fun DangerButton(
     icon: ImageVector = Icons.Outlined.Warning
 ) {
     SecondaryGlassButton(text = text, onClick = onClick, modifier = modifier, icon = icon, accent = AppRed)
+}
+
+@Composable
+fun FormActionFooter(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector = Icons.Outlined.CheckCircle,
+    enabled: Boolean = true,
+    accent: Color = Gold
+) {
+    GlassCard(
+        modifier = modifier.fillMaxWidth(),
+        accent = accent,
+        contentPadding = PaddingValues(10.dp)
+    ) {
+        GoldPrimaryButton(
+            text = text,
+            onClick = onClick,
+            icon = icon,
+            enabled = enabled
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -876,6 +984,7 @@ fun PremiumBottomNavigation(
     currentRoute: String?,
     onNavigate: (String) -> Unit
 ) {
+    val motionEnabled = LocalMotionEnabled.current
     NavigationBar(
         modifier = Modifier
             .padding(horizontal = 12.dp)
@@ -891,7 +1000,7 @@ fun PremiumBottomNavigation(
     ) {
         destinations.forEach { destination ->
             val selected = currentRoute == destination.route
-            val iconScale by animateFloatAsState(
+            val animatedIconScale by animateFloatAsState(
                 targetValue = if (selected) 1.16f else 1f,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -899,11 +1008,13 @@ fun PremiumBottomNavigation(
                 ),
                 label = "bottomIconScale"
             )
-            val iconColor by animateColorAsState(
+            val animatedIconColor by animateColorAsState(
                 targetValue = if (selected) Gold else TextMuted,
                 animationSpec = tween(220),
                 label = "bottomIconColor"
             )
+            val iconScale = if (motionEnabled) animatedIconScale else if (selected) 1.08f else 1f
+            val iconColor = if (motionEnabled) animatedIconColor else if (selected) Gold else TextMuted
             NavigationBarItem(
                 selected = selected,
                 onClick = { onNavigate(destination.route) },
@@ -976,6 +1087,18 @@ fun MoneyText(
     color: Color = Gold,
     style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.titleLarge
 ) {
+    val motionEnabled = LocalMotionEnabled.current
+    if (!motionEnabled) {
+        Text(
+            text = MoneyFormatter.format(amount),
+            modifier = modifier,
+            color = color,
+            style = style,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        return
+    }
     AnimatedContent(
         targetState = amount,
         modifier = modifier,
@@ -1021,6 +1144,52 @@ fun PercentChangeText(
         color = if (positive) AppGreen else AppRed,
         style = MaterialTheme.typography.labelLarge
     )
+}
+
+@Composable
+fun MetricProgressBar(
+    label: String,
+    value: Float,
+    max: Float,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    valueLabel: String? = null
+) {
+    val motionEnabled = LocalMotionEnabled.current
+    val target = if (max <= 0f) 0f else (value / max).coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(
+        targetValue = target,
+        animationSpec = tween(520),
+        label = "metricProgress"
+    )
+    val progress = if (motionEnabled) animatedProgress else target
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(label, color = TextSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+            Text(
+                valueLabel ?: "${NumberFormatter.format((target * 100).toDouble())}٪",
+                color = accent,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(SurfaceGlassStrong)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progress)
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Brush.horizontalGradient(listOf(accent, GoldLight.copy(alpha = 0.82f))))
+            )
+        }
+    }
 }
 
 @Composable

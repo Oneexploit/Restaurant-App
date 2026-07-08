@@ -1,6 +1,7 @@
 package com.restaurant.offlinemanager.ui.projects
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,11 +51,13 @@ import com.restaurant.offlinemanager.core.design.DangerButton
 import com.restaurant.offlinemanager.core.design.DarkOutlinedTextField
 import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.FilterChipRow
+import com.restaurant.offlinemanager.core.design.FormActionFooter
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.GoldLight
 import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
 import com.restaurant.offlinemanager.core.design.LocalDateSelector
+import com.restaurant.offlinemanager.core.design.MetricProgressBar
 import com.restaurant.offlinemanager.core.design.MoneyField
 import com.restaurant.offlinemanager.core.design.MoneyText
 import com.restaurant.offlinemanager.core.design.OptionSelector
@@ -140,7 +143,12 @@ private fun ProjectCard(
     }
     val canRegisterMeal = finance.project.status == ProjectStatus.ACTIVE
     val canRegisterPayment = finance.receivable > 0
-    GlassCard(modifier = Modifier.fillMaxWidth(), accent = statusColor) {
+    GlassCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        accent = statusColor
+    ) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             ProjectThumb(finance.project.name)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -161,6 +169,17 @@ private fun ProjectCard(
                     Text("مانده مطالبات", color = TextSecondary, modifier = Modifier.weight(1f))
                     MoneyText(finance.receivable.coerceAtLeast(0), style = MaterialTheme.typography.titleMedium)
                 }
+                MetricProgressBar(
+                    label = "پرداخت‌شده از درآمد",
+                    value = finance.totalPaid.toFloat(),
+                    max = finance.totalDelivered.toFloat().coerceAtLeast(1f),
+                    accent = if (finance.receivable <= 0) AppGreen else Gold,
+                    valueLabel = if (finance.totalDelivered > 0) {
+                        "${NumberFormatter.format((finance.totalPaid * 100.0 / finance.totalDelivered).coerceIn(0.0, 100.0))}٪"
+                    } else {
+                        "بدون وعده"
+                    }
+                )
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -306,7 +325,7 @@ fun ProjectFormScreen(
         }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }
         item {
-            GoldPrimaryButton(
+            FormActionFooter(
                 text = "ذخیره",
                 icon = Icons.Outlined.Save,
                 onClick = {
@@ -390,6 +409,18 @@ fun ProjectDetailsScreen(
                 Text(finance.project.address.orEmpty(), color = TextMuted)
                 Spacer(Modifier.height(10.dp))
                 StatusChip(finance.project.status.label(), statusColor)
+                Spacer(Modifier.height(12.dp))
+                MetricProgressBar(
+                    label = "وصولی نسبت به کل تحویل",
+                    value = finance.totalPaid.toFloat(),
+                    max = finance.totalDelivered.toFloat().coerceAtLeast(1f),
+                    accent = if (finance.receivable <= 0) AppGreen else Gold,
+                    valueLabel = if (finance.totalDelivered > 0) {
+                        "${NumberFormatter.format((finance.totalPaid * 100.0 / finance.totalDelivered).coerceIn(0.0, 100.0))}٪"
+                    } else {
+                        "بدون تحویل"
+                    }
+                )
             }
         }
         item {

@@ -146,6 +146,10 @@ class RestaurantViewModel(
         settingsRepository.setLowStockNotifications(enabled)
     }
 
+    fun setReducedMotion(enabled: Boolean) = ioAction("تنظیمات حرکت ذخیره شد") {
+        settingsRepository.setReducedMotion(enabled)
+    }
+
     fun exportBackup(context: Context) = ioAction("پشتیبان JSON ذخیره شد") {
         val file = repository.exportBackup(context)
         _messages.tryEmit("فایل پشتیبان: ${file.absolutePath}")

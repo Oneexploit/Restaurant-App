@@ -1,6 +1,8 @@
 package com.restaurant.offlinemanager.ui.finance
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,16 +10,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -26,28 +35,34 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.restaurant.offlinemanager.core.design.BottomSheetActionMenu
 import com.restaurant.offlinemanager.core.design.AppCyan
 import com.restaurant.offlinemanager.core.design.AppGreen
 import com.restaurant.offlinemanager.core.design.AppOrange
 import com.restaurant.offlinemanager.core.design.AppPurple
 import com.restaurant.offlinemanager.core.design.AppRed
 import com.restaurant.offlinemanager.core.design.ConfirmDialog
-import com.restaurant.offlinemanager.core.design.DangerButton
 import com.restaurant.offlinemanager.core.design.DarkOutlinedTextField
 import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.FilterChipRow
+import com.restaurant.offlinemanager.core.design.FormActionFooter
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
 import com.restaurant.offlinemanager.core.design.LocalDateSelector
+import com.restaurant.offlinemanager.core.design.MetricProgressBar
 import com.restaurant.offlinemanager.core.design.MoneyField
 import com.restaurant.offlinemanager.core.design.MoneyText
 import com.restaurant.offlinemanager.core.design.OptionSelector
 import com.restaurant.offlinemanager.core.design.PersianDateText
 import com.restaurant.offlinemanager.core.design.SectionHeader
 import com.restaurant.offlinemanager.core.design.SecondaryGlassButton
+import com.restaurant.offlinemanager.core.design.SheetAction
 import com.restaurant.offlinemanager.core.design.StatCard
 import com.restaurant.offlinemanager.core.design.StatusChip
 import com.restaurant.offlinemanager.core.design.TextMuted
@@ -59,6 +74,7 @@ import com.restaurant.offlinemanager.data.local.entity.BankCardEntity
 import com.restaurant.offlinemanager.data.local.entity.ExpenseCategory
 import com.restaurant.offlinemanager.data.local.entity.ExpenseEntity
 import com.restaurant.offlinemanager.data.local.entity.PaymentMethod
+import com.restaurant.offlinemanager.domain.model.BankCardBalance
 import com.restaurant.offlinemanager.domain.model.ProjectPaymentInput
 import com.restaurant.offlinemanager.domain.model.SupplierPaymentInput
 import com.restaurant.offlinemanager.domain.model.label
@@ -161,19 +177,9 @@ fun FinanceDashboardScreen(
                 if (state.bankBalances.isEmpty()) {
                     item { EmptyState("کارت بانکی ثبت نشده", "برای پیگیری پرداخت‌ها و موجودی، کارت بانکی اضافه کنید.") }
                 } else {
+                    val maxBalance = state.bankBalances.maxOfOrNull { it.balance.coerceAtLeast(0L) }?.coerceAtLeast(1L) ?: 1L
                     items(state.bankBalances, key = { it.card.id }) { balance ->
-                        GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = null, tint = AppCyan)
-                                Column(Modifier.weight(1f)) {
-                                    Text(balance.card.title, color = TextPrimary, style = MaterialTheme.typography.titleMedium)
-                                    Text("${balance.card.bankName.orEmpty()} • ${maskCardNumber(balance.card.cardNumber)}", color = TextSecondary)
-                                }
-                                MoneyText(balance.balance, style = MaterialTheme.typography.titleMedium)
-                            }
-                            Spacer(Modifier.height(8.dp))
-                            SecondaryGlassButton("ویرایش", onClick = { onEditBankCard(balance.card.id) }, icon = Icons.Outlined.Save, accent = AppCyan)
-                        }
+                        BankCardVisual(balance, maxBalance, onEditBankCard)
                     }
                 }
             }
@@ -249,6 +255,70 @@ fun FinanceDashboardScreen(
 }
 
 @Composable
+private fun BankCardVisual(
+    balance: BankCardBalance,
+    maxBalance: Long,
+    onEditBankCard: (Long) -> Unit
+) {
+    val accent = if (balance.balance >= 0) AppCyan else AppRed
+    GlassCard(Modifier.fillMaxWidth(), accent = accent) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(156.dp)
+                .clip(RoundedCornerShape(22.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            AppPurple.copy(alpha = 0.48f),
+                            accent.copy(alpha = 0.34f),
+                            Gold.copy(alpha = 0.20f)
+                        )
+                    )
+                )
+                .padding(16.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxSize()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(balance.card.title, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+                        Text(balance.card.bankName.orEmpty().ifBlank { "کارت بانکی" }, color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    StatusChip(if (balance.card.isActive) "فعال" else "غیرفعال", if (balance.card.isActive) AppGreen else TextMuted)
+                }
+                Text(
+                    maskCardNumber(balance.card.cardNumber),
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Column(Modifier.weight(1f)) {
+                        Text("دارنده", color = TextMuted, style = MaterialTheme.typography.bodySmall)
+                        Text(balance.card.ownerName.orEmpty().ifBlank { "ثبت نشده" }, color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("موجودی", color = TextMuted, style = MaterialTheme.typography.bodySmall)
+                        MoneyText(balance.balance, color = Gold, style = MaterialTheme.typography.titleLarge)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        MetricProgressBar(
+            label = "سهم از بیشترین موجودی کارت‌ها",
+            value = balance.balance.coerceAtLeast(0L).toFloat(),
+            max = maxBalance.toFloat().coerceAtLeast(1f),
+            accent = accent,
+            valueLabel = MoneyFormatter.format(balance.balance)
+        )
+        Spacer(Modifier.height(10.dp))
+        SecondaryGlassButton("ویرایش کارت", onClick = { onEditBankCard(balance.card.id) }, icon = Icons.Outlined.Save, accent = accent)
+    }
+}
+
+@Composable
 private fun FinanceRow(title: String, subtitle: String, amount: Long, chip: String, color: androidx.compose.ui.graphics.Color) {
     GlassCard(Modifier.fillMaxWidth(), accent = color) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -264,6 +334,7 @@ private fun FinanceRow(title: String, subtitle: String, amount: Long, chip: Stri
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PaymentCard(
     kind: String,
@@ -274,22 +345,63 @@ private fun PaymentCard(
     color: androidx.compose.ui.graphics.Color,
     onDelete: (() -> Unit)? = null
 ) {
-    GlassCard(Modifier.fillMaxWidth(), accent = color) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(name, color = TextPrimary, style = MaterialTheme.typography.titleMedium)
-                Text(method, color = TextSecondary)
-                PersianDateText(date)
+    var showActions by remember { mutableStateOf(false) }
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart && onDelete != null) {
+                onDelete()
             }
-            Column(horizontalAlignment = Alignment.End) {
-                StatusChip(kind, color)
-                MoneyText(amount, style = MaterialTheme.typography.titleMedium)
+            false
+        }
+    )
+    val cardContent: @Composable () -> Unit = {
+        GlassCard(Modifier.fillMaxWidth(), accent = color) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(name, color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                    Text(method, color = TextSecondary)
+                    PersianDateText(date)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    StatusChip(kind, color)
+                    MoneyText(amount, style = MaterialTheme.typography.titleMedium)
+                }
+            }
+            if (onDelete != null) {
+                Spacer(Modifier.height(8.dp))
+                SecondaryGlassButton("عملیات", onClick = { showActions = true }, icon = Icons.Outlined.MoreVert, accent = color)
             }
         }
-        if (onDelete != null) {
-            Spacer(Modifier.height(8.dp))
-            DangerButton("حذف", onClick = onDelete)
-        }
+    }
+    if (onDelete != null) {
+        SwipeToDismissBox(
+            state = dismissState,
+            enableDismissFromStartToEnd = false,
+            backgroundContent = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(AppRed.copy(alpha = 0.20f))
+                        .padding(18.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Icon(Icons.Outlined.Delete, contentDescription = "حذف", tint = AppRed)
+                }
+            },
+            content = { cardContent() }
+        )
+    } else {
+        cardContent()
+    }
+    if (showActions && onDelete != null) {
+        BottomSheetActionMenu(
+            title = kind,
+            actions = listOf(
+                SheetAction("حذف", Icons.Outlined.Delete, AppRed, onDelete)
+            ),
+            onDismiss = { showActions = false }
+        )
     }
 }
 
@@ -494,7 +606,7 @@ private fun <T> PaymentFormLayout(
             }
         }
         if (error != null) item { Text(error, color = AppRed) }
-        item { GoldPrimaryButton("ثبت", onClick = onSave, icon = Icons.Outlined.Save) }
+        item { FormActionFooter("ثبت", onClick = onSave, icon = Icons.Outlined.Save) }
     }
 }
 
@@ -535,7 +647,7 @@ fun BankCardFormScreen(
         }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }
         item {
-            GoldPrimaryButton("ذخیره", onClick = {
+            FormActionFooter("ذخیره", onClick = {
                 val initial = MoneyFormatter.parse(balance)
                 error = if (title.isBlank()) "عنوان کارت الزامی است" else null
                 if (error == null) {
@@ -597,7 +709,7 @@ fun ExpenseFormScreen(
         }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }
         item {
-            GoldPrimaryButton("ذخیره", onClick = {
+            FormActionFooter("ذخیره", onClick = {
                 val value = MoneyFormatter.parse(amount)
                 error = when {
                     title.isBlank() -> "عنوان هزینه الزامی است"

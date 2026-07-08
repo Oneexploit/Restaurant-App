@@ -1,5 +1,7 @@
 package com.restaurant.offlinemanager.core.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -56,6 +58,7 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
     val currentRoute = backStackEntry?.destination?.route
     val topLevelRoutes = remember { BottomDestinations.map { it.route }.toSet() + Routes.Home }
     val showBack = currentRoute != null && currentRoute !in topLevelRoutes
+    val motionEnabled = !state.settings.reducedMotionEnabled
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
@@ -75,23 +78,24 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
         onOpenSettings = { navController.navigate(Routes.Settings) },
         onOpenSearch = { navController.navigate(Routes.GlobalSearch) },
         onBack = if (showBack) ({ navController.popBackStack() }) else null,
-        snackbarHostState = snackbarHostState
+        snackbarHostState = snackbarHostState,
+        motionEnabled = motionEnabled
     ) { padding ->
         NavHost(
             navController = navController,
             startDestination = Routes.Home,
             modifier = Modifier.padding(padding),
             enterTransition = {
-                fadeIn(tween(220)) + slideInHorizontally(tween(320)) { it / 6 }
+                if (motionEnabled) fadeIn(tween(220)) + slideInHorizontally(tween(320)) { it / 6 } else EnterTransition.None
             },
             exitTransition = {
-                fadeOut(tween(160)) + slideOutHorizontally(tween(240)) { -it / 10 }
+                if (motionEnabled) fadeOut(tween(160)) + slideOutHorizontally(tween(240)) { -it / 10 } else ExitTransition.None
             },
             popEnterTransition = {
-                fadeIn(tween(220)) + slideInHorizontally(tween(320)) { -it / 6 }
+                if (motionEnabled) fadeIn(tween(220)) + slideInHorizontally(tween(320)) { -it / 6 } else EnterTransition.None
             },
             popExitTransition = {
-                fadeOut(tween(160)) + slideOutHorizontally(tween(240)) { it / 10 }
+                if (motionEnabled) fadeOut(tween(160)) + slideOutHorizontally(tween(240)) { it / 10 } else ExitTransition.None
             }
         ) {
             composable(Routes.Home) {
@@ -322,6 +326,7 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                     state = state,
                     context = context,
                     onLowStockNotifications = viewModel::setLowStockNotifications,
+                    onReducedMotion = viewModel::setReducedMotion,
                     onExportBackup = viewModel::exportBackup,
                     onRestoreBackup = viewModel::restoreBackup
                 )

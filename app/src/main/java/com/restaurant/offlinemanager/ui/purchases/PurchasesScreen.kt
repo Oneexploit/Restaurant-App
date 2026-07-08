@@ -40,6 +40,7 @@ import com.restaurant.offlinemanager.core.design.DangerButton
 import com.restaurant.offlinemanager.core.design.DarkOutlinedTextField
 import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.FilterChipRow
+import com.restaurant.offlinemanager.core.design.FormActionFooter
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
@@ -119,6 +120,7 @@ fun PurchasesListScreen(
                         Column(Modifier.weight(1f)) {
                             Text(supplier.name, color = TextPrimary, style = MaterialTheme.typography.titleMedium)
                             Text(supplier.phone.orEmpty().ifBlank { "شماره تماس ثبت نشده" }, color = TextSecondary)
+                            Text(supplier.address.orEmpty().ifBlank { "آدرس ثبت نشده" }, color = TextMuted)
                         }
                         StatusChip(if (supplier.isActive) "فعال" else "غیرفعال", if (supplier.isActive) AppGreen else TextMuted)
                     }
@@ -277,7 +279,7 @@ fun PurchaseFormScreen(
         }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }
         item {
-            GoldPrimaryButton(
+            FormActionFooter(
                 text = "ثبت و ذخیره فاکتور",
                 icon = Icons.Outlined.Save,
                 enabled = setupReady,
@@ -387,7 +389,7 @@ fun SupplierFormScreen(
         }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }
         item {
-            GoldPrimaryButton(
+            FormActionFooter(
                 text = "ذخیره تامین‌کننده",
                 onClick = {
                     error = if (name.isBlank()) "نام تامین‌کننده الزامی است" else null

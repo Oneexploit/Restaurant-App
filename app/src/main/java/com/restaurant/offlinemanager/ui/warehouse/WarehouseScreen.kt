@@ -39,10 +39,12 @@ import com.restaurant.offlinemanager.core.design.DangerButton
 import com.restaurant.offlinemanager.core.design.DarkOutlinedTextField
 import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.FilterChipRow
+import com.restaurant.offlinemanager.core.design.FormActionFooter
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
 import com.restaurant.offlinemanager.core.design.LocalDateSelector
+import com.restaurant.offlinemanager.core.design.MetricProgressBar
 import com.restaurant.offlinemanager.core.design.MoneyField
 import com.restaurant.offlinemanager.core.design.MoneyText
 import com.restaurant.offlinemanager.core.design.OptionSelector
@@ -145,6 +147,9 @@ private fun InventoryTab(
                     }
                 }
             }
+            item {
+                ReorderSuggestionCard(lowStock.take(4), onStockIn)
+            }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -205,10 +210,47 @@ private fun InventoryCard(item: InventoryItem, onStockIn: () -> Unit, onStockOut
             }
         }
         Spacer(Modifier.height(10.dp))
+        MetricProgressBar(
+            label = "موجودی نسبت به حداقل",
+            value = item.quantity.toFloat(),
+            max = item.minimumStock.toFloat().coerceAtLeast(1f),
+            accent = if (item.isLowStock) AppOrange else AppGreen,
+            valueLabel = "${NumberFormatter.format(item.quantity)} / ${NumberFormatter.format(item.minimumStock)}"
+        )
+        Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SecondaryGlassButton("ورود", onClick = onStockIn, modifier = Modifier.weight(1f), accent = AppGreen)
             SecondaryGlassButton("خروج", onClick = onStockOut, modifier = Modifier.weight(1f), accent = if (item.isLowStock) AppOrange else AppCyan)
         }
+    }
+}
+
+@Composable
+private fun ReorderSuggestionCard(items: List<InventoryItem>, onStockIn: () -> Unit) {
+    GlassCard(Modifier.fillMaxWidth(), accent = AppOrange) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(Icons.Outlined.Warning, contentDescription = null, tint = AppOrange)
+            Column(Modifier.weight(1f)) {
+                Text("پیشنهاد ورود کالا", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                Text("این اقلام زودتر از بقیه به شارژ موجودی نیاز دارند.", color = TextSecondary)
+            }
+            StatusChip("${NumberFormatter.format(items.size)} قلم", AppOrange)
+        }
+        Spacer(Modifier.height(10.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            items.forEach { item ->
+                val needed = (item.minimumStock - item.quantity).coerceAtLeast(0.0)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(item.emoji ?: "•", style = MaterialTheme.typography.titleLarge)
+                    Column(Modifier.weight(1f)) {
+                        Text(item.materialName, color = TextPrimary, style = MaterialTheme.typography.bodyMedium)
+                        Text("${item.warehouseName} • نیاز تقریبی ${NumberFormatter.format(needed)} ${item.unit.label()}", color = TextSecondary, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        SecondaryGlassButton("ثبت ورود کالا", onClick = onStockIn, icon = Icons.Outlined.Add, accent = AppOrange)
     }
 }
 
@@ -393,7 +435,7 @@ fun StockTransactionFormScreen(
         }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }
         item {
-            GoldPrimaryButton(
+            FormActionFooter(
                 text = "ثبت تراکنش",
                 icon = Icons.Outlined.Save,
                 enabled = setupReady,
@@ -473,7 +515,7 @@ fun WarehouseFormScreen(
         }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }
         item {
-            GoldPrimaryButton("ذخیره", onClick = {
+            FormActionFooter("ذخیره", onClick = {
                 error = if (name.isBlank()) "نام انبار الزامی است" else null
                 if (error == null) {
                     onSave(
@@ -545,7 +587,7 @@ fun MaterialFormScreen(
         }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }
         item {
-            GoldPrimaryButton("ثبت متریال", onClick = {
+            FormActionFooter("ثبت متریال", onClick = {
                 val minimum = NumberFormatter.normalizeDigits(minStock).toDoubleOrNull() ?: 0.0
                 error = when {
                     name.isBlank() -> "نام متریال الزامی است"
@@ -628,7 +670,7 @@ fun MaterialCategoryFormScreen(
         }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }
         item {
-            GoldPrimaryButton(
+            FormActionFooter(
                 text = "ذخیره دسته‌بندی",
                 icon = Icons.Outlined.Save,
                 onClick = {

@@ -44,6 +44,7 @@ import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.LowStockWarningCard
+import com.restaurant.offlinemanager.core.design.MetricProgressBar
 import com.restaurant.offlinemanager.core.design.MoneyText
 import com.restaurant.offlinemanager.core.design.PersianDateText
 import com.restaurant.offlinemanager.core.design.SectionHeader
@@ -108,7 +109,12 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            GreetingCard()
+            ExecutiveHeroCard(
+                state = state,
+                onAddPurchase = onAddPurchase,
+                onAddPayment = onAddPayment,
+                onStockIn = onStockIn
+            )
         }
         if (setupSteps.isNotEmpty()) {
             item {
@@ -234,17 +240,78 @@ fun HomeScreen(
 }
 
 @Composable
-private fun GreetingCard() {
-    GlassCard(modifier = Modifier.fillMaxWidth(), accent = Gold) {
+private fun ExecutiveHeroCard(
+    state: AppUiState,
+    onAddPurchase: () -> Unit,
+    onAddPayment: () -> Unit,
+    onStockIn: () -> Unit
+) {
+    val stats = state.dashboard
+    val totalDelivered = state.projectFinances.sumOf { it.totalDelivered }
+    val totalPaid = state.projectFinances.sumOf { it.totalPaid }
+    val monthOutflow = stats.monthPurchasesTotal + stats.monthExpensesTotal
+    val monthBalance = stats.monthReceivedTotal - monthOutflow
+    val receivableProjects = state.projectFinances.count { it.receivable > 0 }
+    val indebtedSuppliers = state.supplierDebts.count { it.remaining > 0 }
+    val actionCount = stats.lowStockItemCount + receivableProjects + indebtedSuppliers
+    val accent = when {
+        stats.lowStockItemCount > 0 -> AppOrange
+        monthBalance < 0 -> AppRed
+        else -> AppGreen
+    }
+    val headline = when {
+        actionCount == 0 -> "امروز همه چیز مرتب است"
+        stats.lowStockItemCount > 0 -> "انبار به رسیدگی سریع نیاز دارد"
+        stats.projectReceivablesTotal > stats.supplierDebtsTotal -> "پیگیری دریافت‌ها اولویت امروز است"
+        else -> "جریان نقدی را نزدیک‌تر کنترل کنید"
+    }
+
+    GlassCard(modifier = Modifier.fillMaxWidth(), accent = accent) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            AppLogoMark(modifier = Modifier.size(58.dp))
+            AppLogoMark(modifier = Modifier.size(62.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("سلام، خوش آمدید", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
-                Text("همه چیز تحت کنترل است", color = TextSecondary)
+                Text(headline, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+                Text("نمای کلی عملیات رستوران", color = TextSecondary)
                 PersianDateText(PersianDateFormatter.nowMillis(), long = true)
             }
-            StatusChip("آفلاین", Gold)
+            StatusChip(if (actionCount == 0) "آماده" else "${NumberFormatter.format(actionCount)} اقدام", accent)
         }
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            HeroMetric("وصولی ماه", MoneyFormatter.format(stats.monthReceivedTotal), AppGreen, Modifier.weight(1f))
+            HeroMetric("خروجی ماه", MoneyFormatter.format(monthOutflow), AppOrange, Modifier.weight(1f))
+            HeroMetric("مانده ماه", MoneyFormatter.format(monthBalance), if (monthBalance >= 0) Gold else AppRed, Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(14.dp))
+        MetricProgressBar(
+            label = "نسبت وصول پروژه‌ها",
+            value = totalPaid.toFloat(),
+            max = totalDelivered.toFloat().coerceAtLeast(1f),
+            accent = AppGreen,
+            valueLabel = if (totalDelivered > 0) "${NumberFormatter.format((totalPaid * 100.0 / totalDelivered).coerceIn(0.0, 100.0))}٪" else "بدون داده"
+        )
+        Spacer(Modifier.height(10.dp))
+        MetricProgressBar(
+            label = "پوشش نقدینگی ماه",
+            value = stats.monthReceivedTotal.toFloat(),
+            max = monthOutflow.toFloat().coerceAtLeast(1f),
+            accent = if (stats.monthReceivedTotal >= monthOutflow) AppGreen else AppOrange,
+            valueLabel = if (monthOutflow > 0) "${NumberFormatter.format((stats.monthReceivedTotal * 100.0 / monthOutflow).coerceAtMost(999.0))}٪" else "بدون هزینه"
+        )
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            SecondaryGlassButton("دریافت", onClick = onAddPayment, icon = Icons.Outlined.Payments, accent = AppGreen, modifier = Modifier.weight(1f))
+            SecondaryGlassButton("خرید", onClick = onAddPurchase, icon = Icons.Outlined.ShoppingCart, accent = Gold, modifier = Modifier.weight(1f))
+            SecondaryGlassButton("انبار", onClick = onStockIn, icon = Icons.Outlined.Inventory, accent = AppCyan, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun HeroMetric(title: String, value: String, accent: Color, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(title, color = TextMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+        Text(value, color = accent, style = MaterialTheme.typography.titleMedium, maxLines = 1)
     }
 }
 
@@ -340,6 +407,14 @@ private fun LowStockRow(item: InventoryItem) {
             }
             StatusChip("کمبود", AppOrange)
         }
+        Spacer(Modifier.height(10.dp))
+        MetricProgressBar(
+            label = "فاصله تا حداقل موجودی",
+            value = item.quantity.toFloat(),
+            max = item.minimumStock.toFloat().coerceAtLeast(1f),
+            accent = AppOrange,
+            valueLabel = "${NumberFormatter.format(item.quantity)} / ${NumberFormatter.format(item.minimumStock)}"
+        )
     }
 }
 
