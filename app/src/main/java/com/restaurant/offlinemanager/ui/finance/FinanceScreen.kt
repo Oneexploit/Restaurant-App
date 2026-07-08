@@ -33,17 +33,21 @@ import com.restaurant.offlinemanager.core.design.AppGreen
 import com.restaurant.offlinemanager.core.design.AppOrange
 import com.restaurant.offlinemanager.core.design.AppPurple
 import com.restaurant.offlinemanager.core.design.AppRed
+import com.restaurant.offlinemanager.core.design.ConfirmDialog
+import com.restaurant.offlinemanager.core.design.DangerButton
 import com.restaurant.offlinemanager.core.design.DarkOutlinedTextField
 import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.FilterChipRow
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
+import com.restaurant.offlinemanager.core.design.LocalDateSelector
 import com.restaurant.offlinemanager.core.design.MoneyField
 import com.restaurant.offlinemanager.core.design.MoneyText
 import com.restaurant.offlinemanager.core.design.OptionSelector
 import com.restaurant.offlinemanager.core.design.PersianDateText
 import com.restaurant.offlinemanager.core.design.SectionHeader
+import com.restaurant.offlinemanager.core.design.SecondaryGlassButton
 import com.restaurant.offlinemanager.core.design.StatCard
 import com.restaurant.offlinemanager.core.design.StatusChip
 import com.restaurant.offlinemanager.core.design.TextMuted
@@ -67,10 +71,17 @@ fun FinanceDashboardScreen(
     onAddProjectPayment: () -> Unit,
     onAddSupplierPayment: () -> Unit,
     onAddBankCard: () -> Unit,
+    onEditBankCard: (Long) -> Unit,
     onAddExpense: () -> Unit,
+    onDeleteProjectPayment: (Long) -> Unit,
+    onDeleteSupplierPayment: (Long) -> Unit,
+    onDeleteExpense: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var tab by remember { mutableIntStateOf(0) }
+    var deleteProjectPaymentId by remember { mutableStateOf<Long?>(null) }
+    var deleteSupplierPaymentId by remember { mutableStateOf<Long?>(null) }
+    var deleteExpenseId by remember { mutableStateOf<Long?>(null) }
     val tabs = listOf("مطالبات پروژه‌ها", "بدهی تامین‌کنندگان", "کارت‌های بانکی", "پرداخت‌ها", "هزینه‌ها")
     LazyColumn(
         modifier = modifier
@@ -112,11 +123,12 @@ fun FinanceDashboardScreen(
         item { FilterChipRow(tabs, tabs[tab], { tab = tabs.indexOf(it) }) }
         when (tab) {
             0 -> {
+                val receivables = state.projectFinances.filter { it.receivable > 0 }
                 item { GoldPrimaryButton("ثبت دریافت", onClick = onAddProjectPayment, icon = Icons.Outlined.Add) }
-                if (state.projectFinances.isEmpty()) {
+                if (receivables.isEmpty()) {
                     item { EmptyState("مطالبه‌ای وجود ندارد", "پس از ثبت پروژه و وعده، مانده پروژه‌ها اینجا نمایش داده می‌شود.") }
                 } else {
-                    items(state.projectFinances, key = { it.project.id }) { finance ->
+                    items(receivables, key = { it.project.id }) { finance ->
                         FinanceRow(
                             title = finance.project.name,
                             subtitle = "تحویل ${MoneyFormatter.format(finance.totalDelivered)} • پرداخت ${MoneyFormatter.format(finance.totalPaid)}",
@@ -128,11 +140,12 @@ fun FinanceDashboardScreen(
                 }
             }
             1 -> {
+                val debts = state.supplierDebts.filter { it.remaining > 0 }
                 item { GoldPrimaryButton("ثبت پرداخت", onClick = onAddSupplierPayment, icon = Icons.Outlined.Add) }
-                if (state.supplierDebts.isEmpty()) {
+                if (debts.isEmpty()) {
                     item { EmptyState("بدهی تامین‌کننده‌ای وجود ندارد", "خریدهای نسیه و پرداخت‌های تامین‌کننده بعد از ثبت اینجا دیده می‌شوند.") }
                 } else {
-                    items(state.supplierDebts, key = { it.supplier.id }) { debt ->
+                    items(debts, key = { it.supplier.id }) { debt ->
                         FinanceRow(
                             title = debt.supplier.name,
                             subtitle = "خرید نسیه ${MoneyFormatter.format(debt.totalCreditPurchases)} • پرداخت ${MoneyFormatter.format(debt.totalPaid)}",
@@ -158,6 +171,8 @@ fun FinanceDashboardScreen(
                                 }
                                 MoneyText(balance.balance, style = MaterialTheme.typography.titleMedium)
                             }
+                            Spacer(Modifier.height(8.dp))
+                            SecondaryGlassButton("ویرایش", onClick = { onEditBankCard(balance.card.id) }, icon = Icons.Outlined.Save, accent = AppCyan)
                         }
                     }
                 }
@@ -168,11 +183,15 @@ fun FinanceDashboardScreen(
                 } else {
                     items(state.snapshot.projectPayments, key = { "p${it.id}" }) { payment ->
                         val project = state.snapshot.projects.firstOrNull { it.id == payment.projectId }
-                        PaymentCard("دریافت پروژه", project?.name.orEmpty(), payment.amount, payment.date, payment.method.label(), AppGreen)
+                        PaymentCard("دریافت پروژه", project?.name.orEmpty(), payment.amount, payment.date, payment.method.label(), AppGreen) {
+                            deleteProjectPaymentId = payment.id
+                        }
                     }
                     items(state.snapshot.supplierPayments, key = { "s${it.id}" }) { payment ->
                         val supplier = state.snapshot.suppliers.firstOrNull { it.id == payment.supplierId }
-                        PaymentCard("پرداخت تامین‌کننده", supplier?.name.orEmpty(), payment.amount, payment.date, payment.method.label(), AppOrange)
+                        PaymentCard("پرداخت تامین‌کننده", supplier?.name.orEmpty(), payment.amount, payment.date, payment.method.label(), AppOrange) {
+                            deleteSupplierPaymentId = payment.id
+                        }
                     }
                 }
             }
@@ -182,12 +201,50 @@ fun FinanceDashboardScreen(
                     item { EmptyState("هزینه‌ای ثبت نشده", "هزینه‌های جاری کسب‌وکار بعد از ثبت اینجا دیده می‌شود.") }
                 } else {
                     items(state.snapshot.expenses, key = { it.id }) { expense ->
-                        PaymentCard(expense.category.label(), expense.title, expense.amount, expense.date, "هزینه", AppRed)
+                        PaymentCard(expense.category.label(), expense.title, expense.amount, expense.date, "هزینه", AppRed) {
+                            deleteExpenseId = expense.id
+                        }
                     }
                 }
             }
         }
         item { Spacer(Modifier.height(20.dp)) }
+    }
+    deleteProjectPaymentId?.let { id ->
+        ConfirmDialog(
+            title = "حذف دریافت پروژه",
+            message = "این دریافت از محاسبه مطالبات و موجودی کارت حذف می‌شود.",
+            confirmText = "حذف",
+            onConfirm = {
+                deleteProjectPaymentId = null
+                onDeleteProjectPayment(id)
+            },
+            onDismiss = { deleteProjectPaymentId = null }
+        )
+    }
+    deleteSupplierPaymentId?.let { id ->
+        ConfirmDialog(
+            title = "حذف پرداخت تامین‌کننده",
+            message = "این پرداخت از محاسبه بدهی تامین‌کننده و موجودی کارت حذف می‌شود.",
+            confirmText = "حذف",
+            onConfirm = {
+                deleteSupplierPaymentId = null
+                onDeleteSupplierPayment(id)
+            },
+            onDismiss = { deleteSupplierPaymentId = null }
+        )
+    }
+    deleteExpenseId?.let { id ->
+        ConfirmDialog(
+            title = "حذف هزینه",
+            message = "این هزینه از گزارش‌ها و موجودی کارت حذف می‌شود.",
+            confirmText = "حذف",
+            onConfirm = {
+                deleteExpenseId = null
+                onDeleteExpense(id)
+            },
+            onDismiss = { deleteExpenseId = null }
+        )
     }
 }
 
@@ -208,7 +265,15 @@ private fun FinanceRow(title: String, subtitle: String, amount: Long, chip: Stri
 }
 
 @Composable
-private fun PaymentCard(kind: String, name: String, amount: Long, date: Long, method: String, color: androidx.compose.ui.graphics.Color) {
+private fun PaymentCard(
+    kind: String,
+    name: String,
+    amount: Long,
+    date: Long,
+    method: String,
+    color: androidx.compose.ui.graphics.Color,
+    onDelete: (() -> Unit)? = null
+) {
     GlassCard(Modifier.fillMaxWidth(), accent = color) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -221,6 +286,27 @@ private fun PaymentCard(kind: String, name: String, amount: Long, date: Long, me
                 MoneyText(amount, style = MaterialTheme.typography.titleMedium)
             }
         }
+        if (onDelete != null) {
+            Spacer(Modifier.height(8.dp))
+            DangerButton("حذف", onClick = onDelete)
+        }
+    }
+}
+
+@Composable
+private fun EmptyPaymentPrerequisite(
+    title: String,
+    message: String,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item { SectionHeader("ثبت پرداخت") }
+        item { EmptyState(title, message) }
     }
 }
 
@@ -231,10 +317,16 @@ fun ProjectPaymentFormScreen(
     onSave: (ProjectPaymentInput) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var project by remember { mutableStateOf(state.snapshot.projects.firstOrNull { it.id == preselectedProjectId } ?: state.snapshot.projects.firstOrNull()) }
+    val projectOptions = state.projectFinances.filter { it.receivable > 0 }.map { it.project }
+    if (projectOptions.isEmpty()) {
+        EmptyPaymentPrerequisite("مطالبه‌ای برای دریافت وجود ندارد", "بعد از ثبت وعده برای پروژه، دریافت قابل ثبت می‌شود.", modifier)
+        return
+    }
+    var project by remember { mutableStateOf(projectOptions.firstOrNull { it.id == preselectedProjectId } ?: projectOptions.firstOrNull()) }
     var card by remember { mutableStateOf<BankCardEntity?>(state.snapshot.bankCards.firstOrNull()) }
     var amount by remember { mutableStateOf("") }
     var method by remember { mutableStateOf(PaymentMethod.BANK_TRANSFER) }
+    var date by remember { mutableStateOf(PersianDateFormatter.todayStartMillis()) }
     var notes by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val remaining = state.projectFinances
@@ -244,7 +336,7 @@ fun ProjectPaymentFormScreen(
     PaymentFormLayout(
         title = "ثبت دریافت از پروژه",
         partyLabel = "پروژه",
-        parties = state.snapshot.projects,
+        parties = projectOptions,
         party = project,
         partyName = { it.name },
         onParty = { project = it },
@@ -255,6 +347,8 @@ fun ProjectPaymentFormScreen(
         onAmount = { amount = it },
         method = method,
         onMethod = { method = it },
+        date = date,
+        onDate = { date = it },
         notes = notes,
         onNotes = { notes = it },
         error = error,
@@ -271,7 +365,7 @@ fun ProjectPaymentFormScreen(
             }
             val p = project
             if (error == null && p != null) {
-                onSave(ProjectPaymentInput(p.id, if (method == PaymentMethod.CASH) null else card?.id, value, PersianDateFormatter.todayStartMillis(), method, notes))
+                onSave(ProjectPaymentInput(p.id, if (method == PaymentMethod.CASH) null else card?.id, value, date, method, notes))
             }
         },
         modifier = modifier
@@ -284,10 +378,16 @@ fun SupplierPaymentFormScreen(
     onSave: (SupplierPaymentInput) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var supplier by remember { mutableStateOf(state.snapshot.suppliers.firstOrNull()) }
+    val supplierOptions = state.supplierDebts.filter { it.remaining > 0 }.map { it.supplier }
+    if (supplierOptions.isEmpty()) {
+        EmptyPaymentPrerequisite("بدهی تامین‌کننده‌ای برای پرداخت وجود ندارد", "بعد از ثبت خرید نسیه، پرداخت تامین‌کننده قابل ثبت می‌شود.", modifier)
+        return
+    }
+    var supplier by remember { mutableStateOf(supplierOptions.firstOrNull()) }
     var card by remember { mutableStateOf<BankCardEntity?>(state.snapshot.bankCards.firstOrNull()) }
     var amount by remember { mutableStateOf("") }
     var method by remember { mutableStateOf(PaymentMethod.CARD_TO_CARD) }
+    var date by remember { mutableStateOf(PersianDateFormatter.todayStartMillis()) }
     var notes by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val remaining = state.supplierDebts
@@ -297,7 +397,7 @@ fun SupplierPaymentFormScreen(
     PaymentFormLayout(
         title = "ثبت پرداخت به تامین‌کننده",
         partyLabel = "تامین‌کننده",
-        parties = state.snapshot.suppliers,
+        parties = supplierOptions,
         party = supplier,
         partyName = { it.name },
         onParty = { supplier = it },
@@ -308,6 +408,8 @@ fun SupplierPaymentFormScreen(
         onAmount = { amount = it },
         method = method,
         onMethod = { method = it },
+        date = date,
+        onDate = { date = it },
         notes = notes,
         onNotes = { notes = it },
         error = error,
@@ -324,7 +426,7 @@ fun SupplierPaymentFormScreen(
             }
             val s = supplier
             if (error == null && s != null) {
-                onSave(SupplierPaymentInput(s.id, if (method == PaymentMethod.CASH) null else card?.id, value, PersianDateFormatter.todayStartMillis(), method, notes))
+                onSave(SupplierPaymentInput(s.id, if (method == PaymentMethod.CASH) null else card?.id, value, date, method, notes))
             }
         },
         modifier = modifier
@@ -346,6 +448,8 @@ private fun <T> PaymentFormLayout(
     onAmount: (String) -> Unit,
     method: PaymentMethod,
     onMethod: (PaymentMethod) -> Unit,
+    date: Long,
+    onDate: (Long) -> Unit,
     notes: String,
     onNotes: (String) -> Unit,
     error: String?,
@@ -384,6 +488,8 @@ private fun <T> PaymentFormLayout(
                     }
                 }
                 Spacer(Modifier.height(10.dp))
+                LocalDateSelector("تاریخ", date, onDate)
+                Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(notes, onNotes, "توضیحات", singleLine = false)
             }
         }
@@ -394,14 +500,17 @@ private fun <T> PaymentFormLayout(
 
 @Composable
 fun BankCardFormScreen(
+    state: AppUiState,
+    cardId: Long?,
     onSave: (BankCardEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var title by remember { mutableStateOf("") }
-    var bank by remember { mutableStateOf("") }
-    var owner by remember { mutableStateOf("") }
-    var number by remember { mutableStateOf("") }
-    var balance by remember { mutableStateOf("") }
+    val editing = state.snapshot.bankCards.firstOrNull { it.id == cardId }
+    var title by remember(editing?.id) { mutableStateOf(editing?.title.orEmpty()) }
+    var bank by remember(editing?.id) { mutableStateOf(editing?.bankName.orEmpty()) }
+    var owner by remember(editing?.id) { mutableStateOf(editing?.ownerName.orEmpty()) }
+    var number by remember(editing?.id) { mutableStateOf(editing?.cardNumber.orEmpty()) }
+    var balance by remember(editing?.id) { mutableStateOf(editing?.initialBalance?.toString().orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
     val now = PersianDateFormatter.nowMillis()
     LazyColumn(
@@ -410,7 +519,7 @@ fun BankCardFormScreen(
             .padding(horizontal = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { SectionHeader("افزودن کارت بانکی") }
+        item { SectionHeader(if (editing == null) "افزودن کارت بانکی" else "ویرایش کارت بانکی") }
         item {
             GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
                 DarkOutlinedTextField(title, { title = it }, "عنوان کارت")
@@ -429,7 +538,22 @@ fun BankCardFormScreen(
             GoldPrimaryButton("ذخیره", onClick = {
                 val initial = MoneyFormatter.parse(balance)
                 error = if (title.isBlank()) "عنوان کارت الزامی است" else null
-                if (error == null) onSave(BankCardEntity(title = title, ownerName = owner, bankName = bank, cardNumber = number, initialBalance = initial, isActive = true, createdAt = now, updatedAt = now))
+                if (error == null) {
+                    onSave(
+                        BankCardEntity(
+                            id = editing?.id ?: 0,
+                            title = title,
+                            ownerName = owner,
+                            bankName = bank,
+                            cardNumber = number,
+                            initialBalance = initial,
+                            isActive = editing?.isActive ?: true,
+                            notes = editing?.notes,
+                            createdAt = editing?.createdAt ?: now,
+                            updatedAt = now
+                        )
+                    )
+                }
             }, icon = Icons.Outlined.Save)
         }
     }
@@ -445,6 +569,7 @@ fun ExpenseFormScreen(
     var category by remember { mutableStateOf(ExpenseCategory.OTHER) }
     var amount by remember { mutableStateOf("") }
     var card by remember { mutableStateOf<BankCardEntity?>(null) }
+    var date by remember { mutableStateOf(PersianDateFormatter.todayStartMillis()) }
     var notes by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val now = PersianDateFormatter.nowMillis()
@@ -465,6 +590,8 @@ fun ExpenseFormScreen(
                 Spacer(Modifier.height(10.dp))
                 OptionSelector("کارت بانکی (اختیاری)", state.snapshot.bankCards.filter { it.isActive }, card, { it.title }) { card = it }
                 Spacer(Modifier.height(10.dp))
+                LocalDateSelector("تاریخ", date, { date = it })
+                Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false)
             }
         }
@@ -477,7 +604,7 @@ fun ExpenseFormScreen(
                     value <= 0 -> "مبلغ باید بیشتر از صفر باشد"
                     else -> null
                 }
-                if (error == null) onSave(ExpenseEntity(title = title, category = category, amount = value, date = PersianDateFormatter.todayStartMillis(), bankCardId = card?.id, notes = notes, createdAt = now, updatedAt = now))
+                if (error == null) onSave(ExpenseEntity(title = title, category = category, amount = value, date = date, bankCardId = card?.id, notes = notes, createdAt = now, updatedAt = now))
             }, icon = Icons.Outlined.Save)
         }
     }

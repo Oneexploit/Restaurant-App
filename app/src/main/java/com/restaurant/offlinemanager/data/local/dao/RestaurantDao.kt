@@ -22,9 +22,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface RestaurantDao {
-    @Query("SELECT COUNT(*) FROM projects")
-    suspend fun projectCount(): Int
-
     @Query("SELECT * FROM projects ORDER BY updatedAt DESC")
     fun observeProjects(): Flow<List<ProjectEntity>>
 
@@ -108,6 +105,12 @@ interface RestaurantDao {
 
     @Query("SELECT * FROM bank_cards WHERE id = :id LIMIT 1")
     suspend fun getBankCard(id: Long): BankCardEntity?
+
+    @Query("SELECT * FROM stock_transactions WHERE id = :id LIMIT 1")
+    suspend fun getStockTransaction(id: Long): StockTransactionEntity?
+
+    @Query("SELECT * FROM purchases WHERE id = :id LIMIT 1")
+    suspend fun getPurchase(id: Long): PurchaseEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProject(entity: ProjectEntity): Long
@@ -228,4 +231,28 @@ interface RestaurantDao {
 
     @Query("DELETE FROM expenses")
     suspend fun clearExpenses()
+
+    @Query("DELETE FROM meal_deliveries WHERE id = :id")
+    suspend fun deleteMealDelivery(id: Long)
+
+    @Query("DELETE FROM stock_transactions WHERE id = :id")
+    suspend fun deleteStockTransaction(id: Long)
+
+    @Query("DELETE FROM stock_transactions WHERE purchaseId = :purchaseId")
+    suspend fun deleteStockTransactionsForPurchase(purchaseId: Long)
+
+    @Query("DELETE FROM purchase_items WHERE purchaseId = :purchaseId")
+    suspend fun deletePurchaseItemsForPurchase(purchaseId: Long)
+
+    @Query("DELETE FROM purchases WHERE id = :id")
+    suspend fun deletePurchase(id: Long)
+
+    @Query("DELETE FROM project_payments WHERE id = :id")
+    suspend fun deleteProjectPayment(id: Long)
+
+    @Query("DELETE FROM supplier_payments WHERE id = :id")
+    suspend fun deleteSupplierPayment(id: Long)
+
+    @Query("DELETE FROM expenses WHERE id = :id")
+    suspend fun deleteExpense(id: Long)
 }

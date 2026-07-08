@@ -5,6 +5,7 @@ import android.net.Uri
 import com.restaurant.offlinemanager.data.local.entity.BankCardEntity
 import com.restaurant.offlinemanager.data.local.entity.ExpenseCategory
 import com.restaurant.offlinemanager.data.local.entity.ExpenseEntity
+import com.restaurant.offlinemanager.data.local.entity.MaterialCategoryEntity
 import com.restaurant.offlinemanager.data.local.entity.MaterialEntity
 import com.restaurant.offlinemanager.data.local.entity.MealDeliveryEntity
 import com.restaurant.offlinemanager.data.local.entity.MealType
@@ -162,6 +163,7 @@ private class FakeRepository(private val snapshot: RestaurantSnapshot) : Restaur
     override suspend fun archiveProject(projectId: Long): Result<Unit> = unsupported()
     override suspend fun saveMealDelivery(input: MealDeliveryInput): Result<Long> = unsupported()
     override suspend fun saveWarehouse(entity: WarehouseEntity): Long = unsupported()
+    override suspend fun saveMaterialCategory(entity: MaterialCategoryEntity): Long = unsupported()
     override suspend fun saveMaterial(entity: MaterialEntity): Long = unsupported()
     override suspend fun saveSupplier(entity: SupplierEntity): Long = unsupported()
     override suspend fun saveStockTransaction(input: StockTransactionInput): Result<Long> = unsupported()
@@ -171,6 +173,12 @@ private class FakeRepository(private val snapshot: RestaurantSnapshot) : Restaur
     override suspend fun saveProjectPayment(input: ProjectPaymentInput): Result<Long> = unsupported()
     override suspend fun saveSupplierPayment(input: SupplierPaymentInput): Result<Long> = unsupported()
     override suspend fun saveExpense(entity: ExpenseEntity): Long = unsupported()
+    override suspend fun deleteMealDelivery(id: Long): Result<Unit> = unsupported()
+    override suspend fun deleteStockTransaction(id: Long): Result<Unit> = unsupported()
+    override suspend fun deletePurchase(id: Long): Result<Unit> = unsupported()
+    override suspend fun deleteProjectPayment(id: Long): Result<Unit> = unsupported()
+    override suspend fun deleteSupplierPayment(id: Long): Result<Unit> = unsupported()
+    override suspend fun deleteExpense(id: Long): Result<Unit> = unsupported()
     override suspend fun exportBackup(context: Context): File = unsupported()
     override suspend fun restoreBackup(context: Context, uri: Uri): Result<Unit> = unsupported()
     override suspend fun exportCsv(context: Context, fileName: String, csv: String): File = unsupported()

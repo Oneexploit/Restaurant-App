@@ -36,6 +36,7 @@ import com.restaurant.offlinemanager.ui.reports.ReportsScreen
 import com.restaurant.offlinemanager.ui.search.SearchScreen
 import com.restaurant.offlinemanager.ui.settings.SettingsScreen
 import com.restaurant.offlinemanager.ui.warehouse.MaterialFormScreen
+import com.restaurant.offlinemanager.ui.warehouse.MaterialCategoryFormScreen
 import com.restaurant.offlinemanager.ui.warehouse.StockTransactionFormScreen
 import com.restaurant.offlinemanager.ui.warehouse.WarehouseFormScreen
 import com.restaurant.offlinemanager.ui.warehouse.WarehouseMainScreen
@@ -48,6 +49,8 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
     val snackbarHostState = remember { SnackbarHostState() }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val topLevelRoutes = remember { BottomDestinations.map { it.route }.toSet() + Routes.Home }
+    val showBack = currentRoute != null && currentRoute !in topLevelRoutes
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
@@ -66,6 +69,7 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
         },
         onOpenSettings = { navController.navigate(Routes.Settings) },
         onOpenSearch = { navController.navigate(Routes.GlobalSearch) },
+        onBack = if (showBack) ({ navController.popBackStack() }) else null,
         snackbarHostState = snackbarHostState
     ) { padding ->
         NavHost(
@@ -82,7 +86,12 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                     onStockOut = { navController.navigate(Routes.AddStockOut) },
                     onAddPurchase = { navController.navigate(Routes.AddEditPurchase) },
                     onAddPayment = { navController.navigate("${Routes.AddProjectPayment}/0") },
-                    onReports = { navController.navigate(Routes.Reports) }
+                    onReports = { navController.navigate(Routes.Reports) },
+                    onAddWarehouse = { navController.navigate("${Routes.AddEditWarehouse}/0") },
+                    onAddMaterialCategory = { navController.navigate("${Routes.AddMaterialCategory}/0") },
+                    onAddMaterial = { navController.navigate("${Routes.AddEditMaterial}/0") },
+                    onAddSupplier = { navController.navigate("${Routes.AddSupplier}/0") },
+                    onAddBankCard = { navController.navigate("${Routes.AddEditBankCard}/0") }
                 )
             }
             composable(Routes.ProjectsList) {
@@ -114,12 +123,15 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
             ) { entry ->
                 val projectId = entry.arguments?.getLong("projectId")?.takeIf { it != 0L }
                 ProjectFormScreen(state, projectId, onSave = {
-                    viewModel.saveProject(it)
-                    navController.popBackStack()
+                    viewModel.saveProject(it) { navController.popBackStack() }
                 })
             }
             composable(Routes.MealDeliveryList) {
-                MealDeliveryListScreen(state, onAddMeal = { navController.navigate("${Routes.AddEditMealDelivery}/0") })
+                MealDeliveryListScreen(
+                    state,
+                    onAddMeal = { navController.navigate("${Routes.AddEditMealDelivery}/0") },
+                    onDeleteMeal = viewModel::deleteMealDelivery
+                )
             }
             composable(
                 route = "${Routes.AddEditMealDelivery}/{projectId}",
@@ -127,8 +139,7 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
             ) { entry ->
                 val projectId = entry.arguments?.getLong("projectId")?.takeIf { it != 0L }
                 MealDeliveryFormScreen(state, projectId, onSave = {
-                    viewModel.saveMealDelivery(it)
-                    navController.popBackStack()
+                    viewModel.saveMealDelivery(it) { navController.popBackStack() }
                 })
             }
             composable(Routes.WarehousesList) {
@@ -137,61 +148,99 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                     onStockIn = { navController.navigate(Routes.AddStockIn) },
                     onStockOut = { navController.navigate(Routes.AddStockOut) },
                     onTransfer = { navController.navigate(Routes.TransferStock) },
-                    onAddWarehouse = { navController.navigate(Routes.AddEditWarehouse) },
-                    onAddMaterial = { navController.navigate(Routes.AddEditMaterial) }
+                    onWaste = { navController.navigate(Routes.AddStockWaste) },
+                    onAdjustment = { navController.navigate(Routes.AddStockAdjustment) },
+                    onAddWarehouse = { navController.navigate("${Routes.AddEditWarehouse}/0") },
+                    onAddMaterialCategory = { navController.navigate("${Routes.AddMaterialCategory}/0") },
+                    onAddMaterial = { navController.navigate("${Routes.AddEditMaterial}/0") },
+                    onEditWarehouse = { navController.navigate("${Routes.AddEditWarehouse}/$it") },
+                    onEditMaterialCategory = { navController.navigate("${Routes.AddMaterialCategory}/$it") },
+                    onEditMaterial = { navController.navigate("${Routes.AddEditMaterial}/$it") },
+                    onDeleteStockTransaction = viewModel::deleteStockTransaction
                 )
             }
             composable(Routes.AddStockIn) {
                 StockTransactionFormScreen(state, StockTransactionType.IN, onSave = {
-                    viewModel.saveStockTransactions(it)
-                    navController.popBackStack()
+                    viewModel.saveStockTransactions(it) { navController.popBackStack() }
                 })
             }
             composable(Routes.AddStockOut) {
                 StockTransactionFormScreen(state, StockTransactionType.OUT, onSave = {
-                    viewModel.saveStockTransactions(it)
-                    navController.popBackStack()
+                    viewModel.saveStockTransactions(it) { navController.popBackStack() }
                 })
             }
             composable(Routes.TransferStock) {
                 StockTransactionFormScreen(state, StockTransactionType.TRANSFER_OUT, onSave = {
-                    viewModel.saveStockTransactions(it)
-                    navController.popBackStack()
+                    viewModel.saveStockTransactions(it) { navController.popBackStack() }
                 })
             }
-            composable(Routes.AddEditWarehouse) {
-                WarehouseFormScreen(onSave = {
-                    viewModel.saveWarehouse(it)
-                    navController.popBackStack()
+            composable(Routes.AddStockWaste) {
+                StockTransactionFormScreen(state, StockTransactionType.WASTE, onSave = {
+                    viewModel.saveStockTransactions(it) { navController.popBackStack() }
                 })
             }
-            composable(Routes.AddEditMaterial) {
-                MaterialFormScreen(state, onSave = {
-                    viewModel.saveMaterial(it)
-                    navController.popBackStack()
+            composable(Routes.AddStockAdjustment) {
+                StockTransactionFormScreen(state, StockTransactionType.ADJUSTMENT, onSave = {
+                    viewModel.saveStockTransactions(it) { navController.popBackStack() }
                 })
+            }
+            composable(
+                route = "${Routes.AddEditWarehouse}/{warehouseId}",
+                arguments = listOf(navArgument("warehouseId") { type = NavType.LongType })
+            ) { entry ->
+                val warehouseId = entry.arguments?.getLong("warehouseId")?.takeIf { it != 0L }
+                WarehouseFormScreen(state, warehouseId, onSave = {
+                    viewModel.saveWarehouse(it) { navController.popBackStack() }
+                })
+            }
+            composable(
+                route = "${Routes.AddMaterialCategory}/{categoryId}",
+                arguments = listOf(navArgument("categoryId") { type = NavType.LongType })
+            ) { entry ->
+                val categoryId = entry.arguments?.getLong("categoryId")?.takeIf { it != 0L }
+                MaterialCategoryFormScreen(state, categoryId, onSave = {
+                    viewModel.saveMaterialCategory(it) { navController.popBackStack() }
+                })
+            }
+            composable(
+                route = "${Routes.AddEditMaterial}/{materialId}",
+                arguments = listOf(navArgument("materialId") { type = NavType.LongType })
+            ) { entry ->
+                val materialId = entry.arguments?.getLong("materialId")?.takeIf { it != 0L }
+                MaterialFormScreen(
+                    state,
+                    materialId,
+                    onSave = {
+                        viewModel.saveMaterial(it) { navController.popBackStack() }
+                    },
+                    onAddCategory = { navController.navigate("${Routes.AddMaterialCategory}/0") }
+                )
             }
             composable(Routes.PurchasesList) {
                 PurchasesListScreen(
                     state,
                     onAddPurchase = { navController.navigate(Routes.AddEditPurchase) },
-                    onAddSupplier = { navController.navigate(Routes.AddSupplier) }
+                    onAddSupplier = { navController.navigate("${Routes.AddSupplier}/0") },
+                    onEditSupplier = { navController.navigate("${Routes.AddSupplier}/$it") },
+                    onDeletePurchase = viewModel::deletePurchase
                 )
             }
             composable(Routes.AddEditPurchase) {
                 PurchaseFormScreen(
                     state,
                     onSave = {
-                        viewModel.savePurchase(it)
-                        navController.popBackStack()
+                        viewModel.savePurchase(it) { navController.popBackStack() }
                     },
-                    onAddSupplier = { navController.navigate(Routes.AddSupplier) }
+                    onAddSupplier = { navController.navigate("${Routes.AddSupplier}/0") }
                 )
             }
-            composable(Routes.AddSupplier) {
-                SupplierFormScreen(onSave = {
-                    viewModel.saveSupplier(it)
-                    navController.popBackStack()
+            composable(
+                route = "${Routes.AddSupplier}/{supplierId}",
+                arguments = listOf(navArgument("supplierId") { type = NavType.LongType })
+            ) { entry ->
+                val supplierId = entry.arguments?.getLong("supplierId")?.takeIf { it != 0L }
+                SupplierFormScreen(state, supplierId, onSave = {
+                    viewModel.saveSupplier(it) { navController.popBackStack() }
                 })
             }
             composable(Routes.FinanceDashboard) {
@@ -199,8 +248,12 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                     state = state,
                     onAddProjectPayment = { navController.navigate("${Routes.AddProjectPayment}/0") },
                     onAddSupplierPayment = { navController.navigate(Routes.AddSupplierPayment) },
-                    onAddBankCard = { navController.navigate(Routes.AddEditBankCard) },
-                    onAddExpense = { navController.navigate(Routes.AddExpense) }
+                    onAddBankCard = { navController.navigate("${Routes.AddEditBankCard}/0") },
+                    onEditBankCard = { navController.navigate("${Routes.AddEditBankCard}/$it") },
+                    onAddExpense = { navController.navigate(Routes.AddExpense) },
+                    onDeleteProjectPayment = viewModel::deleteProjectPayment,
+                    onDeleteSupplierPayment = viewModel::deleteSupplierPayment,
+                    onDeleteExpense = viewModel::deleteExpense
                 )
             }
             composable(
@@ -209,33 +262,43 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
             ) { entry ->
                 val projectId = entry.arguments?.getLong("projectId")?.takeIf { it != 0L }
                 ProjectPaymentFormScreen(state, projectId, onSave = {
-                    viewModel.saveProjectPayment(it)
-                    navController.popBackStack()
+                    viewModel.saveProjectPayment(it) { navController.popBackStack() }
                 })
             }
             composable(Routes.AddSupplierPayment) {
                 SupplierPaymentFormScreen(state, onSave = {
-                    viewModel.saveSupplierPayment(it)
-                    navController.popBackStack()
+                    viewModel.saveSupplierPayment(it) { navController.popBackStack() }
                 })
             }
-            composable(Routes.AddEditBankCard) {
-                BankCardFormScreen(onSave = {
-                    viewModel.saveBankCard(it)
-                    navController.popBackStack()
+            composable(
+                route = "${Routes.AddEditBankCard}/{cardId}",
+                arguments = listOf(navArgument("cardId") { type = NavType.LongType })
+            ) { entry ->
+                val cardId = entry.arguments?.getLong("cardId")?.takeIf { it != 0L }
+                BankCardFormScreen(state, cardId, onSave = {
+                    viewModel.saveBankCard(it) { navController.popBackStack() }
                 })
             }
             composable(Routes.AddExpense) {
                 ExpenseFormScreen(state, onSave = {
-                    viewModel.saveExpense(it)
-                    navController.popBackStack()
+                    viewModel.saveExpense(it) { navController.popBackStack() }
                 })
             }
             composable(Routes.Reports) {
                 ReportsScreen(state, context, onExport = viewModel::exportCsv)
             }
             composable(Routes.GlobalSearch) {
-                SearchScreen(state)
+                SearchScreen(
+                    state,
+                    onResultClick = { result ->
+                        when {
+                            result.id.startsWith("project-payment-") || result.id.startsWith("card-") -> navController.navigate(Routes.FinanceDashboard)
+                            result.id.startsWith("project-") -> navController.navigate("${Routes.ProjectDetails}/${result.rawId}")
+                            result.id.startsWith("material-") || result.id.startsWith("warehouse-") -> navController.navigate(Routes.WarehousesList)
+                            result.id.startsWith("supplier-") || result.id.startsWith("purchase-") -> navController.navigate(Routes.PurchasesList)
+                        }
+                    }
+                )
             }
             composable(Routes.Settings) {
                 SettingsScreen(
@@ -255,9 +318,9 @@ private fun bottomRouteFor(route: String?): String? =
         route == null -> null
         route.startsWith(Routes.Home) -> Routes.Home
         route.startsWith(Routes.ProjectsList) || route.startsWith(Routes.ProjectDetails) || route.startsWith(Routes.AddEditProject) || route.startsWith(Routes.MealDeliveryList) || route.startsWith(Routes.AddEditMealDelivery) -> Routes.ProjectsList
-        route.startsWith(Routes.WarehousesList) || route.startsWith(Routes.AddStockIn) || route.startsWith(Routes.AddStockOut) || route.startsWith(Routes.TransferStock) || route.startsWith(Routes.AddEditWarehouse) || route.startsWith(Routes.AddEditMaterial) -> Routes.WarehousesList
-        route.startsWith(Routes.PurchasesList) || route.startsWith(Routes.AddEditPurchase) || route.startsWith(Routes.AddSupplier) -> Routes.PurchasesList
+        route.startsWith(Routes.WarehousesList) || route.startsWith(Routes.AddStockIn) || route.startsWith(Routes.AddStockOut) || route.startsWith(Routes.TransferStock) || route.startsWith(Routes.AddStockWaste) || route.startsWith(Routes.AddStockAdjustment) || route.startsWith(Routes.AddEditWarehouse) || route.startsWith(Routes.AddMaterialCategory) || route.startsWith(Routes.AddEditMaterial) -> Routes.WarehousesList
         route.startsWith(Routes.FinanceDashboard) || route.startsWith(Routes.AddProjectPayment) || route.startsWith(Routes.AddSupplierPayment) || route.startsWith(Routes.AddEditBankCard) || route.startsWith(Routes.AddExpense) -> Routes.FinanceDashboard
+        route.startsWith(Routes.PurchasesList) || route.startsWith(Routes.AddEditPurchase) || route.startsWith(Routes.AddSupplier) -> Routes.PurchasesList
         route.startsWith(Routes.Reports) -> Routes.Reports
         else -> null
     }
@@ -273,15 +336,18 @@ private fun titleFor(route: String?): String =
         route.startsWith(Routes.AddStockIn) -> "ورود کالا"
         route.startsWith(Routes.AddStockOut) -> "خروج کالا"
         route.startsWith(Routes.TransferStock) -> "انتقال کالا"
+        route.startsWith(Routes.AddStockWaste) -> "ضایعات کالا"
+        route.startsWith(Routes.AddStockAdjustment) -> "اصلاح موجودی"
         route.startsWith(Routes.AddEditWarehouse) -> "فرم انبار"
+        route.startsWith(Routes.AddMaterialCategory) -> "دسته‌بندی کالا"
         route.startsWith(Routes.AddEditMaterial) -> "فرم متریال"
-        route.startsWith(Routes.PurchasesList) || route.startsWith(Routes.AddEditPurchase) -> "خرید روزانه"
-        route.startsWith(Routes.AddSupplier) -> "تامین‌کننده"
         route.startsWith(Routes.FinanceDashboard) -> "مالی"
         route.startsWith(Routes.AddProjectPayment) -> "دریافت پروژه"
         route.startsWith(Routes.AddSupplierPayment) -> "پرداخت تامین‌کننده"
         route.startsWith(Routes.AddEditBankCard) -> "کارت بانکی"
         route.startsWith(Routes.AddExpense) -> "هزینه"
+        route.startsWith(Routes.PurchasesList) || route.startsWith(Routes.AddEditPurchase) -> "خرید روزانه"
+        route.startsWith(Routes.AddSupplier) -> "تامین‌کننده"
         route.startsWith(Routes.Reports) -> "گزارش‌ها"
         route.startsWith(Routes.GlobalSearch) -> "جستجو"
         route.startsWith(Routes.Settings) -> "تنظیمات"

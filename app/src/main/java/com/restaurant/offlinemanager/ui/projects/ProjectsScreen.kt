@@ -46,6 +46,7 @@ import com.restaurant.offlinemanager.core.design.AppPurple
 import com.restaurant.offlinemanager.core.design.AppRed
 import com.restaurant.offlinemanager.core.design.AppSearchBar
 import com.restaurant.offlinemanager.core.design.ConfirmDialog
+import com.restaurant.offlinemanager.core.design.DangerButton
 import com.restaurant.offlinemanager.core.design.DarkOutlinedTextField
 import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.FilterChipRow
@@ -53,10 +54,12 @@ import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.GoldLight
 import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
+import com.restaurant.offlinemanager.core.design.LocalDateSelector
 import com.restaurant.offlinemanager.core.design.MoneyField
 import com.restaurant.offlinemanager.core.design.MoneyText
 import com.restaurant.offlinemanager.core.design.OptionSelector
 import com.restaurant.offlinemanager.core.design.SectionHeader
+import com.restaurant.offlinemanager.core.design.SecondaryGlassButton
 import com.restaurant.offlinemanager.core.design.StatusChip
 import com.restaurant.offlinemanager.core.design.TextMuted
 import com.restaurant.offlinemanager.core.design.TextPrimary
@@ -135,6 +138,8 @@ private fun ProjectCard(
         ProjectStatus.SETTLED -> AppCyan
         ProjectStatus.ARCHIVED -> TextMuted
     }
+    val canRegisterMeal = finance.project.status == ProjectStatus.ACTIVE
+    val canRegisterPayment = finance.receivable > 0
     GlassCard(modifier = Modifier.fillMaxWidth(), accent = statusColor) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             ProjectThumb(finance.project.name)
@@ -163,11 +168,15 @@ private fun ProjectCard(
             TextButton(onClick = onClick) {
                 Text("جزئیات", color = Gold)
             }
-            TextButton(onClick = onAddMeal) {
-                Text("ثبت وعده", color = AppCyan)
+            if (canRegisterMeal) {
+                TextButton(onClick = onAddMeal) {
+                    Text("ثبت وعده", color = AppCyan)
+                }
             }
-            TextButton(onClick = onAddPayment) {
-                Text("ثبت دریافت", color = AppGreen)
+            if (canRegisterPayment) {
+                TextButton(onClick = onAddPayment) {
+                    Text("ثبت دریافت", color = AppGreen)
+                }
             }
         }
     }
@@ -212,6 +221,8 @@ fun ProjectFormScreen(
     var mealPrice by remember(editing?.id) { mutableStateOf(editing?.mealPrice?.toString().orEmpty()) }
     var defaultMeal by remember(editing?.id) { mutableStateOf(editing?.defaultMealType ?: "ناهار") }
     var status by remember(editing?.id) { mutableStateOf(editing?.status ?: ProjectStatus.ACTIVE) }
+    var startDate by remember(editing?.id) { mutableStateOf(editing?.startDate ?: PersianDateFormatter.todayStartMillis()) }
+    var endDate by remember(editing?.id) { mutableStateOf(editing?.endDate) }
     var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -251,6 +262,28 @@ fun ProjectFormScreen(
                 OptionSelector("نوع وعده پیش‌فرض", listOf("صبحانه", "ناهار", "شام"), defaultMeal, { it }) { defaultMeal = it }
             }
         }
+        item { SectionHeader("تاریخ قرارداد") }
+        item {
+            GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
+                LocalDateSelector("تاریخ شروع", startDate, { startDate = it })
+                Spacer(Modifier.height(10.dp))
+                if (endDate == null) {
+                    SecondaryGlassButton(
+                        text = "افزودن تاریخ پایان",
+                        onClick = { endDate = PersianDateFormatter.todayStartMillis() },
+                        accent = AppCyan
+                    )
+                } else {
+                    LocalDateSelector("تاریخ پایان", endDate ?: startDate, { endDate = it })
+                    Spacer(Modifier.height(8.dp))
+                    SecondaryGlassButton(
+                        text = "حذف تاریخ پایان",
+                        onClick = { endDate = null },
+                        accent = TextMuted
+                    )
+                }
+            }
+        }
         item { SectionHeader("وضعیت و توضیحات") }
         item {
             GlassCard(Modifier.fillMaxWidth(), accent = AppOrange) {
@@ -283,6 +316,7 @@ fun ProjectFormScreen(
                         name.isBlank() -> "نام پروژه الزامی است"
                         workerCount <= 0 -> "تعداد نفرات باید بیشتر از صفر باشد"
                         price <= 0 -> "قیمت هر وعده باید بیشتر از صفر باشد"
+                        endDate != null && endDate!! < startDate -> "تاریخ پایان نمی‌تواند قبل از تاریخ شروع باشد"
                         else -> null
                     }
                     if (error == null) {
@@ -297,8 +331,8 @@ fun ProjectFormScreen(
                                 workerCount = workerCount,
                                 mealPrice = price,
                                 defaultMealType = defaultMeal,
-                                startDate = editing?.startDate ?: PersianDateFormatter.todayStartMillis(),
-                                endDate = editing?.endDate,
+                                startDate = startDate,
+                                endDate = endDate,
                                 status = status,
                                 notes = notes
                             )
@@ -335,6 +369,14 @@ fun ProjectDetailsScreen(
         .filter { it.projectId == projectId }
         .sortedByDescending { it.date }
         .take(5)
+    val statusColor = when (finance.project.status) {
+        ProjectStatus.ACTIVE -> AppGreen
+        ProjectStatus.PAUSED -> AppOrange
+        ProjectStatus.SETTLED -> AppCyan
+        ProjectStatus.ARCHIVED -> TextMuted
+    }
+    val canRegisterMeal = finance.project.status == ProjectStatus.ACTIVE
+    val canRegisterPayment = finance.receivable > 0
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -347,7 +389,7 @@ fun ProjectDetailsScreen(
                 Text(finance.project.companyName.orEmpty(), color = TextSecondary)
                 Text(finance.project.address.orEmpty(), color = TextMuted)
                 Spacer(Modifier.height(10.dp))
-                StatusChip(finance.project.status.label(), if (finance.project.status == ProjectStatus.ACTIVE) AppGreen else AppOrange)
+                StatusChip(finance.project.status.label(), statusColor)
             }
         }
         item {
@@ -362,10 +404,16 @@ fun ProjectDetailsScreen(
                 DetailMetric("مانده", MoneyFormatter.format(finance.receivable), Modifier.weight(1f))
             }
         }
-        item { GoldPrimaryButton(text = "ثبت وعده", icon = Icons.Outlined.Restaurant, onClick = { onAddMeal(projectId) }) }
-        item { GoldPrimaryButton(text = "ثبت پرداخت", icon = Icons.Outlined.Payments, onClick = { onAddPayment(projectId) }) }
+        if (canRegisterMeal) {
+            item { GoldPrimaryButton(text = "ثبت وعده", icon = Icons.Outlined.Restaurant, onClick = { onAddMeal(projectId) }) }
+        }
+        if (canRegisterPayment) {
+            item { GoldPrimaryButton(text = "ثبت پرداخت", icon = Icons.Outlined.Payments, onClick = { onAddPayment(projectId) }) }
+        }
         item { GoldPrimaryButton(text = "ویرایش پروژه", icon = Icons.Outlined.Edit, onClick = { onEdit(projectId) }) }
-        item { GoldPrimaryButton(text = "آرشیو پروژه", icon = Icons.Outlined.Archive, onClick = { confirmArchive = true }) }
+        if (finance.project.status != ProjectStatus.ARCHIVED) {
+            item { DangerButton(text = "آرشیو پروژه", icon = Icons.Outlined.Archive, onClick = { confirmArchive = true }) }
+        }
         item { SectionHeader("آخرین وعده‌ها") }
         if (recentMeals.isEmpty()) {
             item { EmptyState("وعده‌ای برای این پروژه ثبت نشده", "از دکمه ثبت وعده، تحویل‌های پروژه را وارد کنید.") }

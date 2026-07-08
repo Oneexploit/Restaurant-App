@@ -156,6 +156,19 @@ class RoomRestaurantRepository(
         )
     }
 
+    override suspend fun saveMaterialCategory(entity: MaterialCategoryEntity): Long {
+        require(entity.name.isNotBlank()) { "نام دسته‌بندی الزامی است" }
+        val now = PersianDateFormatter.nowMillis()
+        return dao.insertMaterialCategory(
+            entity.copy(
+                name = entity.name.trim(),
+                iconName = entity.iconName?.trim()?.ifBlank { null },
+                createdAt = entity.createdAt.takeIf { it > 0 } ?: now,
+                updatedAt = now
+            )
+        )
+    }
+
     override suspend fun saveMaterial(entity: MaterialEntity): Long {
         require(entity.name.isNotBlank()) { "نام متریال الزامی است" }
         require(entity.minimumStock >= 0.0) { "حداقل موجودی نمی‌تواند منفی باشد" }
@@ -416,6 +429,43 @@ class RoomRestaurantRepository(
         )
     }
 
+    override suspend fun deleteMealDelivery(id: Long): Result<Unit> =
+        runCatching {
+            dao.deleteMealDelivery(id)
+        }
+
+    override suspend fun deleteStockTransaction(id: Long): Result<Unit> =
+        runCatching {
+            val tx = dao.getStockTransaction(id) ?: error("تراکنش انبار پیدا نشد")
+            require(tx.purchaseId == null) { "تراکنش‌های خودکار خرید را از خود فاکتور خرید اصلاح یا حذف کنید" }
+            dao.deleteStockTransaction(id)
+        }
+
+    override suspend fun deletePurchase(id: Long): Result<Unit> =
+        runCatching {
+            dao.getPurchase(id) ?: error("فاکتور خرید پیدا نشد")
+            database.withTransaction {
+                dao.deleteStockTransactionsForPurchase(id)
+                dao.deletePurchaseItemsForPurchase(id)
+                dao.deletePurchase(id)
+            }
+        }
+
+    override suspend fun deleteProjectPayment(id: Long): Result<Unit> =
+        runCatching {
+            dao.deleteProjectPayment(id)
+        }
+
+    override suspend fun deleteSupplierPayment(id: Long): Result<Unit> =
+        runCatching {
+            dao.deleteSupplierPayment(id)
+        }
+
+    override suspend fun deleteExpense(id: Long): Result<Unit> =
+        runCatching {
+            dao.deleteExpense(id)
+        }
+
     override suspend fun exportBackup(context: Context): File {
         val backup = BackupJson.encode(currentSnapshot())
         val dir = File(context.getExternalFilesDir(null), "backups").apply { mkdirs() }
@@ -429,6 +479,7 @@ class RoomRestaurantRepository(
             val json = context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
                 ?: error("فایل پشتیبان قابل خواندن نیست")
             val snapshot = BackupJson.decode(json)
+            BackupJson.validate(snapshot)
             database.withTransaction {
                 clearAll()
                 dao.insertMaterialCategories(snapshot.materialCategories)
@@ -708,6 +759,79 @@ private object BackupJson {
                 ExpenseEntity(getLong("id"), getString("title"), ExpenseCategory.valueOf(getString("category")), getLong("amount"), getLong("date"), optLongOrNull("bankCardId"), optStringOrNull("notes"), getLong("createdAt"), getLong("updatedAt"))
             }
         )
+    }
+
+    fun validate(snapshot: RestaurantSnapshot) {
+        val projectIds = snapshot.projects.map { it.id }.toSet()
+        val warehouseIds = snapshot.warehouses.map { it.id }.toSet()
+        val categoryIds = snapshot.materialCategories.map { it.id }.toSet()
+        val materialIds = snapshot.materials.map { it.id }.toSet()
+        val supplierIds = snapshot.suppliers.map { it.id }.toSet()
+        val purchaseIds = snapshot.purchases.map { it.id }.toSet()
+        val bankCardIds = snapshot.bankCards.map { it.id }.toSet()
+
+        require(snapshot.projects.all { it.id > 0 && it.name.isNotBlank() && it.workerCount > 0 && it.mealPrice > 0 }) {
+            "فایل پشتیبان پروژه نامعتبر دارد"
+        }
+        require(snapshot.warehouses.all { it.id > 0 && it.name.isNotBlank() }) {
+            "فایل پشتیبان انبار نامعتبر دارد"
+        }
+        require(snapshot.materialCategories.all { it.id > 0 && it.name.isNotBlank() }) {
+            "فایل پشتیبان دسته‌بندی نامعتبر دارد"
+        }
+        require(snapshot.materials.all { it.id > 0 && it.name.isNotBlank() && it.minimumStock >= 0 && (it.categoryId == null || it.categoryId in categoryIds) }) {
+            "فایل پشتیبان متریال نامعتبر دارد"
+        }
+        require(snapshot.suppliers.all { it.id > 0 && it.name.isNotBlank() }) {
+            "فایل پشتیبان تامین‌کننده نامعتبر دارد"
+        }
+        require(snapshot.bankCards.all { it.id > 0 && it.title.isNotBlank() && it.initialBalance >= 0 }) {
+            "فایل پشتیبان کارت بانکی نامعتبر دارد"
+        }
+        require(snapshot.mealDeliveries.all { it.projectId in projectIds && it.quantity > 0 && it.unitPrice > 0 && it.totalAmount >= 0 }) {
+            "فایل پشتیبان وعده نامعتبر دارد"
+        }
+        require(snapshot.purchases.all { purchase ->
+            purchase.id > 0 &&
+                purchase.warehouseId in warehouseIds &&
+                (purchase.supplierId == null || purchase.supplierId in supplierIds) &&
+                (purchase.bankCardId == null || purchase.bankCardId in bankCardIds) &&
+                purchase.discountAmount >= 0 &&
+                purchase.totalAmount >= 0 &&
+                purchase.paidAmount >= 0
+        }) {
+            "فایل پشتیبان فاکتور خرید نامعتبر دارد"
+        }
+        require(snapshot.purchaseItems.all {
+            it.purchaseId in purchaseIds && it.materialId in materialIds && it.quantity > 0 && it.unitPrice > 0 && it.totalAmount >= 0
+        }) {
+            "فایل پشتیبان آیتم خرید نامعتبر دارد"
+        }
+        require(snapshot.stockTransactions.all {
+            it.warehouseId in warehouseIds &&
+                it.materialId in materialIds &&
+                (it.projectId == null || it.projectId in projectIds) &&
+                (it.supplierId == null || it.supplierId in supplierIds) &&
+                (it.purchaseId == null || it.purchaseId in purchaseIds) &&
+                it.quantity != 0.0
+        }) {
+            "فایل پشتیبان تراکنش انبار نامعتبر دارد"
+        }
+        require(snapshot.projectPayments.all {
+            it.projectId in projectIds && (it.bankCardId == null || it.bankCardId in bankCardIds) && it.amount > 0
+        }) {
+            "فایل پشتیبان دریافت پروژه نامعتبر دارد"
+        }
+        require(snapshot.supplierPayments.all {
+            it.supplierId in supplierIds && (it.bankCardId == null || it.bankCardId in bankCardIds) && it.amount > 0
+        }) {
+            "فایل پشتیبان پرداخت تامین‌کننده نامعتبر دارد"
+        }
+        require(snapshot.expenses.all {
+            (it.bankCardId == null || it.bankCardId in bankCardIds) && it.title.isNotBlank() && it.amount > 0
+        }) {
+            "فایل پشتیبان هزینه نامعتبر دارد"
+        }
     }
 
     private fun JSONObject.array(name: String): JSONArray = optJSONArray(name) ?: JSONArray()

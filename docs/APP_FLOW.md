@@ -2,7 +2,7 @@
 
 ## Launch
 
-`RestaurantOfflineApp` creates `AppContainer`, builds Room, creates repositories/use cases, and seeds demo data if the database is empty.
+`RestaurantOfflineApp` creates `AppContainer`, builds Room, and wires repositories/use cases. The app intentionally starts with an empty local database; users create warehouses, categories, materials, suppliers, cards, and projects themselves.
 
 ## Main Navigation
 

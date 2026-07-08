@@ -47,6 +47,7 @@ import com.restaurant.offlinemanager.core.design.LowStockWarningCard
 import com.restaurant.offlinemanager.core.design.MoneyText
 import com.restaurant.offlinemanager.core.design.PersianDateText
 import com.restaurant.offlinemanager.core.design.SectionHeader
+import com.restaurant.offlinemanager.core.design.SecondaryGlassButton
 import com.restaurant.offlinemanager.core.design.StatCard
 import com.restaurant.offlinemanager.core.design.StatusChip
 import com.restaurant.offlinemanager.core.design.TextMuted
@@ -72,6 +73,11 @@ fun HomeScreen(
     onAddPurchase: () -> Unit,
     onAddPayment: () -> Unit,
     onReports: () -> Unit,
+    onAddWarehouse: () -> Unit,
+    onAddMaterialCategory: () -> Unit,
+    onAddMaterial: () -> Unit,
+    onAddSupplier: () -> Unit,
+    onAddBankCard: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val stats = state.dashboard
@@ -85,6 +91,15 @@ fun HomeScreen(
         .take(3)
     val lowStock = if (lowStockAlertsEnabled) state.inventory.filter { it.isLowStock }.take(4) else emptyList()
     val recentActivity = rememberHomeActivity(state)
+    val setupSteps = rememberSetupSteps(
+        state = state,
+        onAddProject = onAddProject,
+        onAddWarehouse = onAddWarehouse,
+        onAddMaterialCategory = onAddMaterialCategory,
+        onAddMaterial = onAddMaterial,
+        onAddSupplier = onAddSupplier,
+        onAddBankCard = onAddBankCard
+    )
 
     LazyColumn(
         modifier = modifier
@@ -94,6 +109,11 @@ fun HomeScreen(
     ) {
         item {
             GreetingCard()
+        }
+        if (setupSteps.isNotEmpty()) {
+            item {
+                SetupChecklistCard(setupSteps)
+            }
         }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -228,6 +248,66 @@ private fun GreetingCard() {
     }
 }
 
+private data class SetupStep(
+    val title: String,
+    val description: String,
+    val icon: ImageVector,
+    val accent: Color,
+    val onClick: () -> Unit
+)
+
+@Composable
+private fun rememberSetupSteps(
+    state: AppUiState,
+    onAddProject: () -> Unit,
+    onAddWarehouse: () -> Unit,
+    onAddMaterialCategory: () -> Unit,
+    onAddMaterial: () -> Unit,
+    onAddSupplier: () -> Unit,
+    onAddBankCard: () -> Unit
+): List<SetupStep> =
+    androidx.compose.runtime.remember(state.snapshot) {
+        buildList {
+            if (state.snapshot.warehouses.isEmpty()) {
+                add(SetupStep("ساخت اولین انبار", "برای خرید و موجودی لازم است.", Icons.Outlined.Inventory, AppGreen, onAddWarehouse))
+            }
+            if (state.snapshot.materialCategories.isEmpty()) {
+                add(SetupStep("ساخت دسته‌بندی مواد", "دسته‌بندی‌ها را خودتان تعریف کنید.", Icons.Outlined.Add, AppCyan, onAddMaterialCategory))
+            }
+            if (state.snapshot.materials.isEmpty()) {
+                add(SetupStep("ثبت اولین متریال", "مواد اولیه و اقلام مصرفی را وارد کنید.", Icons.Outlined.Restaurant, Gold, onAddMaterial))
+            }
+            if (state.snapshot.suppliers.isEmpty()) {
+                add(SetupStep("ثبت تامین‌کننده", "برای خرید نقدی اختیاری و برای خرید نسیه ضروری است.", Icons.Outlined.ShoppingCart, AppOrange, onAddSupplier))
+            }
+            if (state.snapshot.bankCards.isEmpty()) {
+                add(SetupStep("ثبت کارت بانکی", "برای پرداخت‌ها و دریافت‌های غیرنقدی لازم است.", Icons.Outlined.AccountBalanceWallet, AppPurple, onAddBankCard))
+            }
+            if (state.snapshot.projects.isEmpty()) {
+                add(SetupStep("ثبت اولین پروژه", "بعد از پروژه می‌توانید وعده و دریافت ثبت کنید.", Icons.Outlined.BusinessCenter, AppGreen, onAddProject))
+            }
+        }
+    }
+
+@Composable
+private fun SetupChecklistCard(steps: List<SetupStep>) {
+    GlassCard(modifier = Modifier.fillMaxWidth(), accent = AppCyan) {
+        Text("راه‌اندازی اولیه", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+        Text("برنامه با اطلاعات صفر شروع می‌شود. این موارد را به ترتیب دلخواه خودتان بسازید.", color = TextSecondary)
+        Spacer(Modifier.height(10.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            steps.take(4).forEach { step ->
+                SecondaryGlassButton(
+                    text = step.title,
+                    icon = step.icon,
+                    accent = step.accent,
+                    onClick = step.onClick
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun GoldPrimaryDashboardHint(onAddProject: () -> Unit) {
     GlassCard(modifier = Modifier.fillMaxWidth(), accent = Gold) {
@@ -240,7 +320,7 @@ private fun GoldPrimaryDashboardHint(onAddProject: () -> Unit) {
             StatusChip("یک‌بار", Gold)
         }
         Spacer(Modifier.height(10.dp))
-        com.restaurant.offlinemanager.core.design.SecondaryGlassButton(
+        SecondaryGlassButton(
             text = "افزودن پروژه",
             icon = Icons.Outlined.Add,
             onClick = onAddProject

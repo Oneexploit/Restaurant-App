@@ -32,6 +32,17 @@ object PersianDateFormatter {
         return LocalDate.now(zone).plusDays(days).atStartOfDay(zone).toInstant().toEpochMilli()
     }
 
+    fun shiftDays(timestamp: Long, days: Long): Long {
+        val zone = ZoneId.systemDefault()
+        return Instant.ofEpochMilli(timestamp)
+            .atZone(zone)
+            .toLocalDate()
+            .plusDays(days)
+            .atStartOfDay(zone)
+            .toInstant()
+            .toEpochMilli()
+    }
+
     fun format(timestamp: Long): String {
         val date = Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
         val jalali = gregorianToJalali(date.year, date.monthValue, date.dayOfMonth)

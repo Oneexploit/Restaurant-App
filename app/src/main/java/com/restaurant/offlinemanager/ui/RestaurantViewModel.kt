@@ -1,12 +1,15 @@
 package com.restaurant.offlinemanager.ui
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.restaurant.offlinemanager.data.local.entity.BankCardEntity
 import com.restaurant.offlinemanager.data.local.entity.ExpenseEntity
+import com.restaurant.offlinemanager.data.local.entity.MaterialCategoryEntity
 import com.restaurant.offlinemanager.data.local.entity.MaterialEntity
 import com.restaurant.offlinemanager.data.local.entity.SupplierEntity
 import com.restaurant.offlinemanager.data.local.entity.WarehouseEntity
@@ -34,6 +37,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 data class AppUiState(
     val isLoading: Boolean = true,
@@ -81,55 +86,59 @@ class RestaurantViewModel(
         initialValue = AppUiState()
     )
 
-    fun saveProject(input: ProjectInput) = ioAction("پروژه ذخیره شد") {
+    fun saveProject(input: ProjectInput, onSuccess: () -> Unit = {}) = ioAction("پروژه ذخیره شد", onSuccess) {
         repository.saveProject(input)
     }
 
-    fun archiveProject(projectId: Long) = ioAction("پروژه آرشیو شد") {
+    fun archiveProject(projectId: Long, onSuccess: () -> Unit = {}) = ioAction("پروژه آرشیو شد", onSuccess) {
         repository.archiveProject(projectId).getOrThrow()
     }
 
-    fun saveMealDelivery(input: MealDeliveryInput) = ioAction("وعده ثبت شد") {
+    fun saveMealDelivery(input: MealDeliveryInput, onSuccess: () -> Unit = {}) = ioAction("وعده ثبت شد", onSuccess) {
         repository.saveMealDelivery(input).getOrThrow()
     }
 
-    fun saveWarehouse(entity: WarehouseEntity) = ioAction("انبار ذخیره شد") {
+    fun saveWarehouse(entity: WarehouseEntity, onSuccess: () -> Unit = {}) = ioAction("انبار ذخیره شد", onSuccess) {
         repository.saveWarehouse(entity)
     }
 
-    fun saveMaterial(entity: MaterialEntity) = ioAction("متریال ذخیره شد") {
+    fun saveMaterialCategory(entity: MaterialCategoryEntity, onSuccess: () -> Unit = {}) = ioAction("دسته‌بندی ذخیره شد", onSuccess) {
+        repository.saveMaterialCategory(entity)
+    }
+
+    fun saveMaterial(entity: MaterialEntity, onSuccess: () -> Unit = {}) = ioAction("متریال ذخیره شد", onSuccess) {
         repository.saveMaterial(entity)
     }
 
-    fun saveSupplier(entity: SupplierEntity) = ioAction("تامین‌کننده ذخیره شد") {
+    fun saveSupplier(entity: SupplierEntity, onSuccess: () -> Unit = {}) = ioAction("تامین‌کننده ذخیره شد", onSuccess) {
         repository.saveSupplier(entity)
     }
 
-    fun saveStockTransaction(input: StockTransactionInput) = ioAction("تراکنش انبار ثبت شد") {
+    fun saveStockTransaction(input: StockTransactionInput, onSuccess: () -> Unit = {}) = ioAction("تراکنش انبار ثبت شد", onSuccess) {
         repository.saveStockTransaction(input).getOrThrow()
     }
 
-    fun saveStockTransactions(inputs: List<StockTransactionInput>) = ioAction("تراکنش‌های انبار ثبت شد") {
+    fun saveStockTransactions(inputs: List<StockTransactionInput>, onSuccess: () -> Unit = {}) = ioAction("تراکنش‌های انبار ثبت شد", onSuccess) {
         repository.saveStockTransactions(inputs).getOrThrow()
     }
 
-    fun savePurchase(input: PurchaseInput) = ioAction("فاکتور خرید ثبت شد") {
+    fun savePurchase(input: PurchaseInput, onSuccess: () -> Unit = {}) = ioAction("فاکتور خرید ثبت شد", onSuccess) {
         repository.savePurchase(input).getOrThrow()
     }
 
-    fun saveBankCard(entity: BankCardEntity) = ioAction("کارت بانکی ذخیره شد") {
+    fun saveBankCard(entity: BankCardEntity, onSuccess: () -> Unit = {}) = ioAction("کارت بانکی ذخیره شد", onSuccess) {
         repository.saveBankCard(entity)
     }
 
-    fun saveProjectPayment(input: ProjectPaymentInput) = ioAction("دریافت پروژه ثبت شد") {
+    fun saveProjectPayment(input: ProjectPaymentInput, onSuccess: () -> Unit = {}) = ioAction("دریافت پروژه ثبت شد", onSuccess) {
         repository.saveProjectPayment(input).getOrThrow()
     }
 
-    fun saveSupplierPayment(input: SupplierPaymentInput) = ioAction("پرداخت تامین‌کننده ثبت شد") {
+    fun saveSupplierPayment(input: SupplierPaymentInput, onSuccess: () -> Unit = {}) = ioAction("پرداخت تامین‌کننده ثبت شد", onSuccess) {
         repository.saveSupplierPayment(input).getOrThrow()
     }
 
-    fun saveExpense(entity: ExpenseEntity) = ioAction("هزینه ثبت شد") {
+    fun saveExpense(entity: ExpenseEntity, onSuccess: () -> Unit = {}) = ioAction("هزینه ثبت شد", onSuccess) {
         repository.saveExpense(entity)
     }
 
@@ -140,6 +149,7 @@ class RestaurantViewModel(
     fun exportBackup(context: Context) = ioAction("پشتیبان JSON ذخیره شد") {
         val file = repository.exportBackup(context)
         _messages.tryEmit("فایل پشتیبان: ${file.absolutePath}")
+        shareFile(context, file, "application/json")
     }
 
     fun restoreBackup(context: Context, uri: Uri) = ioAction("بازیابی انجام شد") {
@@ -157,16 +167,56 @@ class RestaurantViewModel(
         }
         val file = repository.exportCsv(context, "${type.filePrefix}-${System.currentTimeMillis()}.csv", csv)
         _messages.tryEmit("فایل CSV: ${file.absolutePath}")
+        shareFile(context, file, "text/csv")
     }
 
-    private fun ioAction(success: String, block: suspend () -> Unit) {
+    fun deleteMealDelivery(id: Long) = ioAction("وعده حذف شد") {
+        repository.deleteMealDelivery(id).getOrThrow()
+    }
+
+    fun deleteStockTransaction(id: Long) = ioAction("تراکنش انبار حذف شد") {
+        repository.deleteStockTransaction(id).getOrThrow()
+    }
+
+    fun deletePurchase(id: Long) = ioAction("فاکتور خرید حذف شد") {
+        repository.deletePurchase(id).getOrThrow()
+    }
+
+    fun deleteProjectPayment(id: Long) = ioAction("دریافت پروژه حذف شد") {
+        repository.deleteProjectPayment(id).getOrThrow()
+    }
+
+    fun deleteSupplierPayment(id: Long) = ioAction("پرداخت تامین‌کننده حذف شد") {
+        repository.deleteSupplierPayment(id).getOrThrow()
+    }
+
+    fun deleteExpense(id: Long) = ioAction("هزینه حذف شد") {
+        repository.deleteExpense(id).getOrThrow()
+    }
+
+    private fun ioAction(success: String, onSuccess: () -> Unit = {}, block: suspend () -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 block()
                 _messages.emit(success)
+                withContext(Dispatchers.Main) {
+                    onSuccess()
+                }
             } catch (error: Throwable) {
                 _messages.emit(error.message ?: "خطای ناشناخته رخ داد")
             }
+        }
+    }
+
+    private suspend fun shareFile(context: Context, file: File, mimeType: String) {
+        withContext(Dispatchers.Main) {
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = mimeType
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری فایل"))
         }
     }
 }

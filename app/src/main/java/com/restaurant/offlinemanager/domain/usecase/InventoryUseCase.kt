@@ -20,14 +20,15 @@ class InventoryUseCase(private val repository: RestaurantRepository) {
         val inventory = mutableListOf<InventoryItem>()
         snapshot.warehouses.filter { it.isActive }.forEach { warehouse ->
             snapshot.materials.filter { it.isActive }.forEach { material ->
-                val quantity = grouped[warehouse.id to material.id].orEmpty().sumOf { tx ->
+                val transactions = grouped[warehouse.id to material.id].orEmpty()
+                val quantity = transactions.sumOf { tx ->
                     when (tx.type) {
                         StockTransactionType.IN, StockTransactionType.TRANSFER_IN -> tx.quantity
                         StockTransactionType.OUT, StockTransactionType.TRANSFER_OUT, StockTransactionType.WASTE -> -tx.quantity
                         StockTransactionType.ADJUSTMENT -> tx.quantity
                     }
                 }
-                if (quantity != 0.0 || material.minimumStock > 0.0) {
+                if (transactions.isNotEmpty()) {
                     val unitPrice = latestPrices[material.id] ?: 0L
                     inventory += InventoryItem(
                         materialId = material.id,

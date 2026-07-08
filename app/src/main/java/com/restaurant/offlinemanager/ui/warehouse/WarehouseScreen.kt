@@ -34,12 +34,15 @@ import com.restaurant.offlinemanager.core.design.AppGreen
 import com.restaurant.offlinemanager.core.design.AppOrange
 import com.restaurant.offlinemanager.core.design.AppRed
 import com.restaurant.offlinemanager.core.design.AppSearchBar
+import com.restaurant.offlinemanager.core.design.ConfirmDialog
+import com.restaurant.offlinemanager.core.design.DangerButton
 import com.restaurant.offlinemanager.core.design.DarkOutlinedTextField
 import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.FilterChipRow
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
+import com.restaurant.offlinemanager.core.design.LocalDateSelector
 import com.restaurant.offlinemanager.core.design.MoneyField
 import com.restaurant.offlinemanager.core.design.MoneyText
 import com.restaurant.offlinemanager.core.design.OptionSelector
@@ -55,6 +58,7 @@ import com.restaurant.offlinemanager.core.design.TextSecondary
 import com.restaurant.offlinemanager.core.utils.MoneyFormatter
 import com.restaurant.offlinemanager.core.utils.NumberFormatter
 import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
+import com.restaurant.offlinemanager.data.local.entity.MaterialCategoryEntity
 import com.restaurant.offlinemanager.data.local.entity.MaterialEntity
 import com.restaurant.offlinemanager.data.local.entity.StockReason
 import com.restaurant.offlinemanager.data.local.entity.StockTransactionType
@@ -74,12 +78,19 @@ fun WarehouseMainScreen(
     onStockIn: () -> Unit,
     onStockOut: () -> Unit,
     onTransfer: () -> Unit,
+    onWaste: () -> Unit,
+    onAdjustment: () -> Unit,
     onAddWarehouse: () -> Unit,
+    onAddMaterialCategory: () -> Unit,
     onAddMaterial: () -> Unit,
+    onEditWarehouse: (Long) -> Unit,
+    onEditMaterialCategory: (Long) -> Unit,
+    onEditMaterial: (Long) -> Unit,
+    onDeleteStockTransaction: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var tab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("موجودی کالا", "انبارها", "تراکنش‌ها", "متریال‌ها")
+    val tabs = listOf("موجودی کالا", "انبارها", "تراکنش‌ها", "متریال‌ها", "دسته‌بندی‌ها")
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -88,10 +99,11 @@ fun WarehouseMainScreen(
         FilterChipRow(tabs, tabs[tab], { tab = tabs.indexOf(it) })
         Spacer(Modifier.height(12.dp))
         when (tab) {
-            0 -> InventoryTab(state, onStockIn, onStockOut, onTransfer)
-            1 -> WarehousesTab(state, onAddWarehouse)
-            2 -> TransactionsTab(state)
-            3 -> MaterialsTab(state, onAddMaterial)
+            0 -> InventoryTab(state, onStockIn, onStockOut, onTransfer, onWaste, onAdjustment)
+            1 -> WarehousesTab(state, onAddWarehouse, onEditWarehouse)
+            2 -> TransactionsTab(state, onDeleteStockTransaction)
+            3 -> MaterialsTab(state, onAddMaterial, onAddMaterialCategory, onEditMaterial)
+            4 -> CategoriesTab(state, onAddMaterialCategory, onEditMaterialCategory)
         }
     }
 }
@@ -101,7 +113,9 @@ private fun InventoryTab(
     state: AppUiState,
     onStockIn: () -> Unit,
     onStockOut: () -> Unit,
-    onTransfer: () -> Unit
+    onTransfer: () -> Unit,
+    onWaste: () -> Unit,
+    onAdjustment: () -> Unit
 ) {
     var query by remember { mutableStateOf("") }
     var selectedWarehouse by remember { mutableStateOf(state.snapshot.warehouses.firstOrNull()?.name ?: "همه") }
@@ -156,7 +170,13 @@ private fun InventoryTab(
                 GoldPrimaryButton("خروج کالا", onClick = onStockOut, icon = Icons.Outlined.Inventory, modifier = Modifier.weight(1f))
             }
         }
-        item { GoldPrimaryButton("انتقال کالا", onClick = onTransfer, icon = Icons.Outlined.Inventory) }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                GoldPrimaryButton("انتقال", onClick = onTransfer, icon = Icons.Outlined.Inventory, modifier = Modifier.weight(1f))
+                GoldPrimaryButton("ضایعات", onClick = onWaste, icon = Icons.Outlined.Warning, modifier = Modifier.weight(1f))
+            }
+        }
+        item { GoldPrimaryButton("اصلاح موجودی", onClick = onAdjustment, icon = Icons.Outlined.Save) }
         if (items.isEmpty()) {
             item { EmptyState("موجودی خالی است", "پس از ثبت خرید یا ورود کالا، موجودی اینجا نمایش داده می‌شود.") }
         } else {
@@ -193,7 +213,7 @@ private fun InventoryCard(item: InventoryItem, onStockIn: () -> Unit, onStockOut
 }
 
 @Composable
-private fun WarehousesTab(state: AppUiState, onAddWarehouse: () -> Unit) {
+private fun WarehousesTab(state: AppUiState, onAddWarehouse: () -> Unit, onEditWarehouse: (Long) -> Unit) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { GoldPrimaryButton("افزودن انبار", onClick = onAddWarehouse, icon = Icons.Outlined.Add) }
         if (state.snapshot.warehouses.isEmpty()) {
@@ -214,6 +234,8 @@ private fun WarehousesTab(state: AppUiState, onAddWarehouse: () -> Unit) {
                             MoneyText(inventory.sumOf { it.approximateValue }, style = MaterialTheme.typography.titleMedium)
                         }
                     }
+                    Spacer(Modifier.height(8.dp))
+                    SecondaryGlassButton("ویرایش", onClick = { onEditWarehouse(warehouse.id) }, icon = Icons.Outlined.Save, accent = AppCyan)
                 }
             }
         }
@@ -221,7 +243,8 @@ private fun WarehousesTab(state: AppUiState, onAddWarehouse: () -> Unit) {
 }
 
 @Composable
-private fun TransactionsTab(state: AppUiState) {
+private fun TransactionsTab(state: AppUiState, onDeleteStockTransaction: (Long) -> Unit) {
+    var deleteId by remember { mutableStateOf<Long?>(null) }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         val transactions = state.snapshot.stockTransactions.take(60)
         if (transactions.isEmpty()) {
@@ -244,16 +267,37 @@ private fun TransactionsTab(state: AppUiState) {
                             Text("${NumberFormatter.format(tx.quantity)} ${tx.unit.label()}", color = TextPrimary)
                         }
                     }
+                    if (tx.purchaseId == null) {
+                        Spacer(Modifier.height(8.dp))
+                        DangerButton("حذف تراکنش", onClick = { deleteId = tx.id })
+                    }
                 }
             }
         }
     }
+    deleteId?.let { id ->
+        ConfirmDialog(
+            title = "حذف تراکنش انبار",
+            message = "این تراکنش از محاسبه موجودی حذف می‌شود.",
+            confirmText = "حذف",
+            onConfirm = {
+                deleteId = null
+                onDeleteStockTransaction(id)
+            },
+            onDismiss = { deleteId = null }
+        )
+    }
 }
 
 @Composable
-private fun MaterialsTab(state: AppUiState, onAddMaterial: () -> Unit) {
+private fun MaterialsTab(state: AppUiState, onAddMaterial: () -> Unit, onAddCategory: () -> Unit, onEditMaterial: (Long) -> Unit) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { GoldPrimaryButton("افزودن متریال", onClick = onAddMaterial, icon = Icons.Outlined.Add) }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                GoldPrimaryButton("افزودن متریال", onClick = onAddMaterial, icon = Icons.Outlined.Add, modifier = Modifier.weight(1f))
+                GoldPrimaryButton("دسته‌بندی", onClick = onAddCategory, icon = Icons.Outlined.Add, modifier = Modifier.weight(1f))
+            }
+        }
         if (state.snapshot.materials.isEmpty()) {
             item { EmptyState("متریالی ثبت نشده", "مواد اولیه و اقلام مصرفی را برای استفاده در خرید و انبار اضافه کنید.") }
         } else {
@@ -270,6 +314,8 @@ private fun MaterialsTab(state: AppUiState, onAddMaterial: () -> Unit) {
                         }
                         StatusChip(if (material.isActive) "فعال" else "غیرفعال", if (material.isActive) AppGreen else TextMuted)
                     }
+                    Spacer(Modifier.height(8.dp))
+                    SecondaryGlassButton("ویرایش", onClick = { onEditMaterial(material.id) }, icon = Icons.Outlined.Save, accent = AppCyan)
                 }
             }
         }
@@ -290,12 +336,14 @@ fun StockTransactionFormScreen(
     var material by remember { mutableStateOf(materials.firstOrNull()) }
     var quantity by remember { mutableStateOf("") }
     var unitPrice by remember { mutableStateOf("") }
+    var date by remember { mutableStateOf(PersianDateFormatter.todayStartMillis()) }
     var notes by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val availableStock = state.inventory
         .firstOrNull { it.warehouseId == fromWarehouse?.id && it.materialId == material?.id }
         ?.quantity ?: 0.0
     val isOutbound = mode == StockTransactionType.OUT || mode == StockTransactionType.TRANSFER_OUT || mode == StockTransactionType.WASTE
+    val setupReady = warehouses.isNotEmpty() && materials.isNotEmpty()
 
     LazyColumn(
         modifier = modifier
@@ -304,6 +352,14 @@ fun StockTransactionFormScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { SectionHeader(mode.label()) }
+        if (!setupReady) {
+            item {
+                EmptyState(
+                    "پیش‌نیاز ثبت تراکنش کامل نیست",
+                    "برای ثبت انبار، ابتدا حداقل یک انبار فعال و یک متریال فعال بسازید."
+                )
+            }
+        }
         item {
             GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
                 OptionSelector(if (mode == StockTransactionType.TRANSFER_OUT) "انبار مبدا" else "انبار", warehouses, fromWarehouse, { it.name }) { fromWarehouse = it }
@@ -326,11 +382,11 @@ fun StockTransactionFormScreen(
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    QuantityField(quantity, { quantity = it }, "مقدار", Modifier.weight(1f))
+                    QuantityField(quantity, { quantity = it }, if (mode == StockTransactionType.ADJUSTMENT) "مقدار اصلاحی (+/-)" else "مقدار", Modifier.weight(1f))
                     MoneyField(unitPrice, { unitPrice = it }, "قیمت واحد", Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(10.dp))
-                DarkOutlinedTextField(PersianDateFormatter.format(PersianDateFormatter.todayStartMillis()), {}, "تاریخ", readOnly = true)
+                LocalDateSelector("تاریخ", date, { date = it })
                 Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(notes, { notes = it }, "یادداشت", singleLine = false)
             }
@@ -340,13 +396,15 @@ fun StockTransactionFormScreen(
             GoldPrimaryButton(
                 text = "ثبت تراکنش",
                 icon = Icons.Outlined.Save,
+                enabled = setupReady,
                 onClick = {
                     val qty = NumberFormatter.normalizeDigits(quantity).toDoubleOrNull() ?: 0.0
                     val price = MoneyFormatter.parse(unitPrice).takeIf { it > 0 }
                     error = when {
                         fromWarehouse == null -> "انبار را انتخاب کنید"
                         material == null -> "متریال را انتخاب کنید"
-                        qty <= 0.0 -> "مقدار باید بیشتر از صفر باشد"
+                        mode == StockTransactionType.ADJUSTMENT && qty == 0.0 -> "مقدار اصلاحی نمی‌تواند صفر باشد"
+                        mode != StockTransactionType.ADJUSTMENT && qty <= 0.0 -> "مقدار باید بیشتر از صفر باشد"
                         mode == StockTransactionType.TRANSFER_OUT && toWarehouse == null -> "انبار مقصد را انتخاب کنید"
                         mode == StockTransactionType.TRANSFER_OUT && toWarehouse?.id == fromWarehouse?.id -> "انبار مبدا و مقصد نمی‌تواند یکسان باشد"
                         isOutbound && qty > availableStock -> "موجودی کافی نیست"
@@ -355,7 +413,6 @@ fun StockTransactionFormScreen(
                     val wh = fromWarehouse
                     val mat = material
                     if (error == null && wh != null && mat != null) {
-                        val date = PersianDateFormatter.todayStartMillis()
                         val input = StockTransactionInput(
                             warehouseId = wh.id,
                             materialId = mat.id,
@@ -384,13 +441,16 @@ fun StockTransactionFormScreen(
 
 @Composable
 fun WarehouseFormScreen(
+    state: AppUiState,
+    warehouseId: Long?,
     onSave: (WarehouseEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var name by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf(WarehouseType.GENERAL) }
-    var address by remember { mutableStateOf("") }
-    var notes by remember { mutableStateOf("") }
+    val editing = state.snapshot.warehouses.firstOrNull { it.id == warehouseId }
+    var name by remember(editing?.id) { mutableStateOf(editing?.name.orEmpty()) }
+    var type by remember(editing?.id) { mutableStateOf(editing?.type ?: WarehouseType.GENERAL) }
+    var address by remember(editing?.id) { mutableStateOf(editing?.address.orEmpty()) }
+    var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
     val now = PersianDateFormatter.nowMillis()
     LazyColumn(
@@ -399,7 +459,7 @@ fun WarehouseFormScreen(
             .padding(horizontal = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { SectionHeader("افزودن انبار") }
+        item { SectionHeader(if (editing == null) "افزودن انبار" else "ویرایش انبار") }
         item {
             GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
                 DarkOutlinedTextField(name, { name = it }, "نام انبار")
@@ -415,7 +475,20 @@ fun WarehouseFormScreen(
         item {
             GoldPrimaryButton("ذخیره", onClick = {
                 error = if (name.isBlank()) "نام انبار الزامی است" else null
-                if (error == null) onSave(WarehouseEntity(name = name, type = type, address = address, notes = notes, isActive = true, createdAt = now, updatedAt = now))
+                if (error == null) {
+                    onSave(
+                        WarehouseEntity(
+                            id = editing?.id ?: 0,
+                            name = name,
+                            type = type,
+                            address = address,
+                            notes = notes,
+                            isActive = editing?.isActive ?: true,
+                            createdAt = editing?.createdAt ?: now,
+                            updatedAt = now
+                        )
+                    )
+                }
             }, icon = Icons.Outlined.Save)
         }
     }
@@ -424,14 +497,23 @@ fun WarehouseFormScreen(
 @Composable
 fun MaterialFormScreen(
     state: AppUiState,
+    materialId: Long?,
     onSave: (MaterialEntity) -> Unit,
+    onAddCategory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var name by remember { mutableStateOf("") }
-    var unit by remember { mutableStateOf(UnitType.KG) }
-    var minStock by remember { mutableStateOf("") }
-    var emoji by remember { mutableStateOf("🍽") }
-    var category by remember { mutableStateOf(state.snapshot.materialCategories.firstOrNull()) }
+    val editing = state.snapshot.materials.firstOrNull { it.id == materialId }
+    var name by remember(editing?.id) { mutableStateOf(editing?.name.orEmpty()) }
+    var unit by remember(editing?.id) { mutableStateOf(editing?.mainUnit ?: UnitType.KG) }
+    var minStock by remember(editing?.id) { mutableStateOf(editing?.minimumStock?.toString().orEmpty()) }
+    var emoji by remember(editing?.id) { mutableStateOf(editing?.imageEmoji ?: "🍽") }
+    var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
+    var category by remember(editing?.id, state.snapshot.materialCategories) {
+        mutableStateOf(
+            state.snapshot.materialCategories.firstOrNull { it.id == editing?.categoryId }
+                ?: state.snapshot.materialCategories.firstOrNull()
+        )
+    }
     var error by remember { mutableStateOf<String?>(null) }
     val now = PersianDateFormatter.nowMillis()
     LazyColumn(
@@ -440,12 +522,14 @@ fun MaterialFormScreen(
             .padding(horizontal = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { SectionHeader("افزودن متریال") }
+        item { SectionHeader(if (editing == null) "افزودن متریال" else "ویرایش متریال") }
         item {
             GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
                 DarkOutlinedTextField(name, { name = it }, "نام متریال")
                 Spacer(Modifier.height(10.dp))
                 OptionSelector("دسته‌بندی", state.snapshot.materialCategories, category, { it.name }) { category = it }
+                Spacer(Modifier.height(8.dp))
+                SecondaryGlassButton("افزودن دسته‌بندی", onClick = onAddCategory, icon = Icons.Outlined.Add, accent = AppCyan)
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OptionSelector("واحد", UnitType.entries, unit, { it.label() }, modifier = Modifier.weight(1f)) { unit = it }
@@ -453,6 +537,8 @@ fun MaterialFormScreen(
                 }
                 Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(emoji, { emoji = it }, "آیکن/ایموجی")
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false)
                 Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(PersianDateFormatter.format(PersianDateFormatter.todayStartMillis()), {}, "تاریخ ثبت", readOnly = true)
             }
@@ -463,25 +549,105 @@ fun MaterialFormScreen(
                 val minimum = NumberFormatter.normalizeDigits(minStock).toDoubleOrNull() ?: 0.0
                 error = when {
                     name.isBlank() -> "نام متریال الزامی است"
+                    category == null -> "دسته‌بندی متریال را انتخاب کنید"
                     minimum < 0.0 -> "حداقل موجودی نمی‌تواند منفی باشد"
                     else -> null
                 }
                 if (error == null) {
                     onSave(
                         MaterialEntity(
+                            id = editing?.id ?: 0,
                             name = name,
                             categoryId = category?.id,
                             mainUnit = unit,
                             minimumStock = minimum,
                             imageEmoji = emoji,
-                            isActive = true,
-                            createdAt = now,
+                            notes = notes,
+                            isActive = editing?.isActive ?: true,
+                            createdAt = editing?.createdAt ?: now,
                             updatedAt = now
                         )
                     )
                 }
             }, icon = Icons.Outlined.Save)
         }
+    }
+}
+
+@Composable
+private fun CategoriesTab(state: AppUiState, onAddCategory: () -> Unit, onEditCategory: (Long) -> Unit) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { GoldPrimaryButton("افزودن دسته‌بندی", onClick = onAddCategory, icon = Icons.Outlined.Add) }
+        if (state.snapshot.materialCategories.isEmpty()) {
+            item { EmptyState("دسته‌بندی ثبت نشده", "قبل از ثبت متریال، دسته‌بندی‌های دلخواه خودتان را بسازید.") }
+        } else {
+            items(state.snapshot.materialCategories, key = { it.id }) { category ->
+                val count = state.snapshot.materials.count { it.categoryId == category.id }
+                GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(category.iconName ?: "•", style = MaterialTheme.typography.headlineMedium)
+                        Column(Modifier.weight(1f)) {
+                            Text(category.name, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+                            Text("${NumberFormatter.format(count)} متریال در این دسته", color = TextSecondary)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    SecondaryGlassButton("ویرایش", onClick = { onEditCategory(category.id) }, icon = Icons.Outlined.Save, accent = AppCyan)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MaterialCategoryFormScreen(
+    state: AppUiState,
+    categoryId: Long?,
+    onSave: (MaterialCategoryEntity) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val editing = state.snapshot.materialCategories.firstOrNull { it.id == categoryId }
+    var name by remember(editing?.id) { mutableStateOf(editing?.name.orEmpty()) }
+    var icon by remember(editing?.id) { mutableStateOf(editing?.iconName.orEmpty()) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val now = PersianDateFormatter.nowMillis()
+
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item { SectionHeader(if (editing == null) "افزودن دسته‌بندی" else "ویرایش دسته‌بندی") }
+        item {
+            GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
+                DarkOutlinedTextField(name, { name = it }, "نام دسته‌بندی")
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(icon, { icon = it }, "آیکن/ایموجی اختیاری")
+            }
+        }
+        if (error != null) item { Text(error.orEmpty(), color = AppRed) }
+        item {
+            GoldPrimaryButton(
+                text = "ذخیره دسته‌بندی",
+                icon = Icons.Outlined.Save,
+                onClick = {
+                    error = if (name.isBlank()) "نام دسته‌بندی الزامی است" else null
+                    if (error == null) {
+                        onSave(
+                            MaterialCategoryEntity(
+                                id = editing?.id ?: 0,
+                                name = name,
+                                iconName = icon.ifBlank { null },
+                                createdAt = editing?.createdAt ?: now,
+                                updatedAt = now
+                            )
+                        )
+                    }
+                }
+            )
+        }
+        item { Spacer(Modifier.height(20.dp)) }
     }
 }
 

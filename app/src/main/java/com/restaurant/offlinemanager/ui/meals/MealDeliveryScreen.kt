@@ -26,12 +26,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.restaurant.offlinemanager.core.design.AppCyan
 import com.restaurant.offlinemanager.core.design.AppSearchBar
+import com.restaurant.offlinemanager.core.design.ConfirmDialog
+import com.restaurant.offlinemanager.core.design.DangerButton
 import com.restaurant.offlinemanager.core.design.DarkOutlinedTextField
 import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.FilterChipRow
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
+import com.restaurant.offlinemanager.core.design.LocalDateSelector
 import com.restaurant.offlinemanager.core.design.MoneyField
 import com.restaurant.offlinemanager.core.design.OptionSelector
 import com.restaurant.offlinemanager.core.design.QuantityField
@@ -54,9 +57,11 @@ import com.restaurant.offlinemanager.ui.AppUiState
 fun MealDeliveryListScreen(
     state: AppUiState,
     onAddMeal: () -> Unit,
+    onDeleteMeal: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val deliveries = state.snapshot.mealDeliveries.take(40)
+    var deleteId by remember { mutableStateOf<Long?>(null) }
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -81,10 +86,24 @@ fun MealDeliveryListScreen(
                             Text(MoneyFormatter.format(delivery.totalAmount), color = Gold)
                         }
                     }
+                    Spacer(Modifier.height(8.dp))
+                    DangerButton("حذف وعده", onClick = { deleteId = delivery.id })
                 }
             }
         }
         item { Spacer(Modifier.height(20.dp)) }
+    }
+    deleteId?.let { id ->
+        ConfirmDialog(
+            title = "حذف وعده",
+            message = "این وعده از محاسبات پروژه حذف می‌شود.",
+            confirmText = "حذف",
+            onConfirm = {
+                deleteId = null
+                onDeleteMeal(id)
+            },
+            onDismiss = { deleteId = null }
+        )
     }
 }
 
@@ -96,6 +115,7 @@ fun MealDeliveryFormScreen(
     modifier: Modifier = Modifier
 ) {
     val projects = state.snapshot.projects.filter { it.status != ProjectStatus.ARCHIVED }
+    val setupReady = projects.isNotEmpty()
     var projectQuery by remember { mutableStateOf("") }
     val filteredProjects = projects.filter {
         projectQuery.isBlank() ||
@@ -106,6 +126,7 @@ fun MealDeliveryFormScreen(
     var mealType by remember { mutableStateOf(MealType.LUNCH) }
     var quantity by remember { mutableStateOf(selectedProject?.workerCount?.toString().orEmpty()) }
     var unitPrice by remember { mutableStateOf(selectedProject?.mealPrice?.toString().orEmpty()) }
+    var date by remember { mutableStateOf(PersianDateFormatter.todayStartMillis()) }
     var notes by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -127,6 +148,9 @@ fun MealDeliveryFormScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { SectionHeader("ثبت وعده") }
+        if (!setupReady) {
+            item { EmptyState("پروژه فعالی برای ثبت وعده وجود ندارد", "ابتدا یک پروژه فعال بسازید، سپس وعده‌های آن را ثبت کنید.") }
+        }
         item { AppSearchBar(projectQuery, { projectQuery = it }, label = "جستجوی پروژه") }
         item {
             OptionSelector("انتخاب پروژه", filteredProjects, selectedProject, { "${it.name} • ${it.workerCount} نفر" }) {
@@ -170,7 +194,7 @@ fun MealDeliveryFormScreen(
                 MoneyField(unitPrice, { unitPrice = it }, "قیمت واحد", modifier = Modifier.weight(1f))
             }
         }
-        item { DarkOutlinedTextField(PersianDateFormatter.format(PersianDateFormatter.todayStartMillis()), {}, "تاریخ", readOnly = true) }
+        item { LocalDateSelector("تاریخ", date, { date = it }) }
         item { DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false) }
         item {
             GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
@@ -185,6 +209,7 @@ fun MealDeliveryFormScreen(
             GoldPrimaryButton(
                 text = "ثبت وعده",
                 icon = Icons.Outlined.Save,
+                enabled = setupReady,
                 onClick = {
                     error = when {
                         selectedProject == null -> "پروژه را انتخاب کنید"
@@ -197,7 +222,7 @@ fun MealDeliveryFormScreen(
                         onSave(
                             MealDeliveryInput(
                                 projectId = project.id,
-                                date = PersianDateFormatter.todayStartMillis(),
+                                date = date,
                                 mealType = mealType,
                                 quantity = count,
                                 unitPrice = price,

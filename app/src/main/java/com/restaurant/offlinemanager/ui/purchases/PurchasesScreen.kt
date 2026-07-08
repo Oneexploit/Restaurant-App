@@ -35,18 +35,22 @@ import com.restaurant.offlinemanager.core.design.AppGreen
 import com.restaurant.offlinemanager.core.design.AppOrange
 import com.restaurant.offlinemanager.core.design.AppRed
 import com.restaurant.offlinemanager.core.design.AppSearchBar
+import com.restaurant.offlinemanager.core.design.ConfirmDialog
+import com.restaurant.offlinemanager.core.design.DangerButton
 import com.restaurant.offlinemanager.core.design.DarkOutlinedTextField
 import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.FilterChipRow
 import com.restaurant.offlinemanager.core.design.GlassCard
 import com.restaurant.offlinemanager.core.design.Gold
 import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
+import com.restaurant.offlinemanager.core.design.LocalDateSelector
 import com.restaurant.offlinemanager.core.design.MoneyField
 import com.restaurant.offlinemanager.core.design.MoneyText
 import com.restaurant.offlinemanager.core.design.OptionSelector
 import com.restaurant.offlinemanager.core.design.PersianDateText
 import com.restaurant.offlinemanager.core.design.QuantityField
 import com.restaurant.offlinemanager.core.design.SectionHeader
+import com.restaurant.offlinemanager.core.design.SecondaryGlassButton
 import com.restaurant.offlinemanager.core.design.StatCard
 import com.restaurant.offlinemanager.core.design.StatusChip
 import com.restaurant.offlinemanager.core.design.TextMuted
@@ -68,10 +72,13 @@ fun PurchasesListScreen(
     state: AppUiState,
     onAddPurchase: () -> Unit,
     onAddSupplier: () -> Unit,
+    onEditSupplier: (Long) -> Unit,
+    onDeletePurchase: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("همه") }
+    var deleteId by remember { mutableStateOf<Long?>(null) }
     val purchases = state.snapshot.purchases.filter { purchase ->
         val supplier = state.snapshot.suppliers.firstOrNull { it.id == purchase.supplierId }?.name.orEmpty()
         val queryMatch = query.isBlank() || supplier.contains(query) || purchase.invoiceNumber.orEmpty().contains(query)
@@ -103,6 +110,23 @@ fun PurchasesListScreen(
         }
         item { GoldPrimaryButton("ثبت فاکتور خرید", onClick = onAddPurchase, icon = Icons.Outlined.ShoppingCart) }
         item { GoldPrimaryButton("افزودن تامین‌کننده", onClick = onAddSupplier, icon = Icons.Outlined.Add) }
+        if (state.snapshot.suppliers.isNotEmpty()) {
+            item { SectionHeader("تامین‌کنندگان") }
+            items(state.snapshot.suppliers, key = { "supplier-${it.id}" }) { supplier ->
+                GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.ShoppingCart, contentDescription = null, tint = AppCyan)
+                        Column(Modifier.weight(1f)) {
+                            Text(supplier.name, color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                            Text(supplier.phone.orEmpty().ifBlank { "شماره تماس ثبت نشده" }, color = TextSecondary)
+                        }
+                        StatusChip(if (supplier.isActive) "فعال" else "غیرفعال", if (supplier.isActive) AppGreen else TextMuted)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    SecondaryGlassButton("ویرایش", onClick = { onEditSupplier(supplier.id) }, icon = Icons.Outlined.Save, accent = AppCyan)
+                }
+            }
+        }
         if (purchases.isEmpty()) {
             item { EmptyState("خریدی پیدا نشد", "برای شروع یک فاکتور روزانه ثبت کنید.") }
         } else {
@@ -125,10 +149,24 @@ fun PurchasesListScreen(
                             MoneyText(purchase.totalAmount, style = MaterialTheme.typography.titleMedium)
                         }
                     }
+                    Spacer(Modifier.height(8.dp))
+                    DangerButton("حذف فاکتور", onClick = { deleteId = purchase.id })
                 }
             }
         }
         item { Spacer(Modifier.height(20.dp)) }
+    }
+    deleteId?.let { id ->
+        ConfirmDialog(
+            title = "حذف فاکتور خرید",
+            message = "فاکتور، آیتم‌های آن و ورود خودکار انبار حذف می‌شود.",
+            confirmText = "حذف",
+            onConfirm = {
+                deleteId = null
+                onDeletePurchase(id)
+            },
+            onDismiss = { deleteId = null }
+        )
     }
 }
 
@@ -148,11 +186,13 @@ fun PurchaseFormScreen(
     var card by remember { mutableStateOf(cards.firstOrNull()) }
     var invoice by remember { mutableStateOf("") }
     var discount by remember { mutableStateOf("") }
+    var date by remember { mutableStateOf(PersianDateFormatter.todayStartMillis()) }
     var notes by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val rows = remember { mutableStateListOf(PurchaseRow()) }
 
     val activeMaterials = state.snapshot.materials.filter { it.isActive }
+    val setupReady = warehouses.isNotEmpty() && activeMaterials.isNotEmpty()
     val inputs = rows.mapNotNull { row ->
         val material = activeMaterials.firstOrNull { it.id == row.materialId }
         val qty = NumberFormatter.normalizeDigits(row.quantity).toDoubleOrNull() ?: 0.0
@@ -176,6 +216,14 @@ fun PurchaseFormScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { SectionHeader("ثبت فاکتور خرید") }
+        if (!setupReady) {
+            item {
+                EmptyState(
+                    "پیش‌نیاز خرید کامل نیست",
+                    "برای ثبت فاکتور، ابتدا حداقل یک انبار و یک متریال فعال بسازید."
+                )
+            }
+        }
         item {
             GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
                 OptionSelector("تامین‌کننده", suppliers, supplier, { it.name }) { supplier = it }
@@ -199,7 +247,7 @@ fun PurchaseFormScreen(
                     MoneyField(discount, { discount = it }, "تخفیف", modifier = Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(10.dp))
-                DarkOutlinedTextField(PersianDateFormatter.format(PersianDateFormatter.todayStartMillis()), {}, "تاریخ", readOnly = true)
+                LocalDateSelector("تاریخ", date, { date = it })
                 Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false)
             }
@@ -232,6 +280,7 @@ fun PurchaseFormScreen(
             GoldPrimaryButton(
                 text = "ثبت و ذخیره فاکتور",
                 icon = Icons.Outlined.Save,
+                enabled = setupReady,
                 onClick = {
                     error = when {
                         warehouse == null -> "انبار مقصد را انتخاب کنید"
@@ -248,7 +297,7 @@ fun PurchaseFormScreen(
                             PurchaseInput(
                                 supplierId = supplier?.id,
                                 warehouseId = wh.id,
-                                date = PersianDateFormatter.todayStartMillis(),
+                                date = date,
                                 invoiceNumber = invoice,
                                 paymentType = paymentType,
                                 bankCardId = if (paymentType == PurchasePaymentType.CARD) card?.id else null,
@@ -305,13 +354,16 @@ private data class PurchaseRow(
 
 @Composable
 fun SupplierFormScreen(
+    state: AppUiState,
+    supplierId: Long?,
     onSave: (SupplierEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var name by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var address by remember { mutableStateOf("") }
-    var notes by remember { mutableStateOf("") }
+    val editing = state.snapshot.suppliers.firstOrNull { it.id == supplierId }
+    var name by remember(editing?.id) { mutableStateOf(editing?.name.orEmpty()) }
+    var phone by remember(editing?.id) { mutableStateOf(editing?.phone.orEmpty()) }
+    var address by remember(editing?.id) { mutableStateOf(editing?.address.orEmpty()) }
+    var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
     val now = PersianDateFormatter.nowMillis()
 
@@ -321,7 +373,7 @@ fun SupplierFormScreen(
             .padding(horizontal = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { SectionHeader("افزودن تامین‌کننده") }
+        item { SectionHeader(if (editing == null) "افزودن تامین‌کننده" else "ویرایش تامین‌کننده") }
         item {
             GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
                 DarkOutlinedTextField(name, { name = it }, "نام تامین‌کننده")
@@ -342,12 +394,13 @@ fun SupplierFormScreen(
                     if (error == null) {
                         onSave(
                             SupplierEntity(
+                                id = editing?.id ?: 0,
                                 name = name,
                                 phone = phone,
                                 address = address,
                                 notes = notes,
-                                isActive = true,
-                                createdAt = now,
+                                isActive = editing?.isActive ?: true,
+                                createdAt = editing?.createdAt ?: now,
                                 updatedAt = now
                             )
                         )

@@ -1,5 +1,6 @@
 package com.restaurant.offlinemanager.ui.search
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -35,6 +36,7 @@ import com.restaurant.offlinemanager.ui.AppUiState
 
 data class SearchResultUi(
     val id: String,
+    val rawId: Long,
     val title: String,
     val subtitle: String,
     val type: String
@@ -43,6 +45,7 @@ data class SearchResultUi(
 @Composable
 fun SearchScreen(
     state: AppUiState,
+    onResultClick: (SearchResultUi) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var query by remember { mutableStateOf("") }
@@ -50,26 +53,26 @@ fun SearchScreen(
     val results = remember(query, state.snapshot) {
         if (query.isBlank()) emptyList() else buildList {
             state.snapshot.projects.filter { it.name.contains(query) || it.companyName.orEmpty().contains(query) }.forEach {
-                add(SearchResultUi("project-${it.id}", it.name, it.companyName.orEmpty(), "پروژه"))
+                add(SearchResultUi("project-${it.id}", it.id, it.name, it.companyName.orEmpty(), "پروژه"))
             }
             state.snapshot.materials.filter { it.name.contains(query) }.forEach {
-                add(SearchResultUi("material-${it.id}", it.name, it.notes.orEmpty(), "متریال"))
+                add(SearchResultUi("material-${it.id}", it.id, it.name, it.notes.orEmpty(), "متریال"))
             }
             state.snapshot.suppliers.filter { it.name.contains(query) || it.phone.orEmpty().contains(query) }.forEach {
-                add(SearchResultUi("supplier-${it.id}", it.name, it.phone.orEmpty(), "تامین‌کننده"))
+                add(SearchResultUi("supplier-${it.id}", it.id, it.name, it.phone.orEmpty(), "تامین‌کننده"))
             }
             state.snapshot.warehouses.filter { it.name.contains(query) }.forEach {
-                add(SearchResultUi("warehouse-${it.id}", it.name, it.address.orEmpty(), "انبار"))
+                add(SearchResultUi("warehouse-${it.id}", it.id, it.name, it.address.orEmpty(), "انبار"))
             }
             state.snapshot.purchases.filter { it.invoiceNumber.orEmpty().contains(query) }.forEach {
-                add(SearchResultUi("purchase-${it.id}", "فاکتور ${it.invoiceNumber}", MoneyFormatter.format(it.totalAmount), "خرید"))
+                add(SearchResultUi("purchase-${it.id}", it.id, "فاکتور ${it.invoiceNumber}", MoneyFormatter.format(it.totalAmount), "خرید"))
             }
             state.snapshot.projectPayments.filter { it.amount.toString().contains(query) }.forEach {
                 val project = state.snapshot.projects.firstOrNull { p -> p.id == it.projectId }?.name.orEmpty()
-                add(SearchResultUi("project-payment-${it.id}", project, "${MoneyFormatter.format(it.amount)} • ${PersianDateFormatter.format(it.date)}", "دریافت"))
+                add(SearchResultUi("project-payment-${it.id}", it.id, project, "${MoneyFormatter.format(it.amount)} • ${PersianDateFormatter.format(it.date)}", "دریافت"))
             }
             state.snapshot.bankCards.filter { it.title.contains(query) || it.cardNumber.orEmpty().contains(query) }.forEach {
-                add(SearchResultUi("card-${it.id}", it.title, maskCardNumber(it.cardNumber), "کارت بانکی"))
+                add(SearchResultUi("card-${it.id}", it.id, it.title, maskCardNumber(it.cardNumber), "کارت بانکی"))
             }
         }
     }
@@ -99,7 +102,7 @@ fun SearchScreen(
                 visibleResults.groupBy { it.type }.forEach { (type, groupedResults) ->
                     item { SectionHeader(type) }
                     items(groupedResults, key = { it.id }) { result ->
-                        GlassCard(Modifier.fillMaxWidth()) {
+                        GlassCard(Modifier.fillMaxWidth().clickable { onResultClick(result) }) {
                             Column {
                                 StatusChip(result.type, Gold)
                                 Spacer(Modifier.height(8.dp))

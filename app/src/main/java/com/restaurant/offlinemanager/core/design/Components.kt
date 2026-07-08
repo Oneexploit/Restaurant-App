@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Business
@@ -92,6 +94,7 @@ fun AppScaffold(
     onNavigate: (String) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState? = null,
     floatingAction: (@Composable () -> Unit)? = null,
@@ -104,6 +107,7 @@ fun AppScaffold(
         onNavigate = onNavigate,
         onOpenSettings = onOpenSettings,
         onOpenSearch = onOpenSearch,
+        onBack = onBack,
         modifier = modifier,
         snackbarHostState = snackbarHostState,
         floatingAction = floatingAction,
@@ -119,6 +123,7 @@ fun PremiumScaffold(
     onNavigate: (String) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState? = null,
     floatingAction: (@Composable () -> Unit)? = null,
@@ -131,7 +136,8 @@ fun PremiumScaffold(
             PremiumTopBar(
                 title = title,
                 onOpenSettings = onOpenSettings,
-                onOpenSearch = onOpenSearch
+                onOpenSearch = onOpenSearch,
+                onBack = onBack
             )
         },
         bottomBar = {
@@ -169,14 +175,16 @@ fun PremiumBackground(
 fun AppTopBar(
     title: String,
     onOpenSettings: () -> Unit,
-    onOpenSearch: () -> Unit
-) = PremiumTopBar(title, onOpenSettings, onOpenSearch)
+    onOpenSearch: () -> Unit,
+    onBack: (() -> Unit)? = null
+) = PremiumTopBar(title, onOpenSettings, onOpenSearch, onBack)
 
 @Composable
 fun PremiumTopBar(
     title: String,
     onOpenSettings: () -> Unit,
-    onOpenSearch: () -> Unit
+    onOpenSearch: () -> Unit,
+    onBack: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -184,7 +192,13 @@ fun PremiumTopBar(
             .padding(horizontal = AppDimens.ScreenPadding, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AppLogoMark(modifier = Modifier.size(46.dp))
+        if (onBack != null) {
+            IconButton(onClick = onBack, modifier = Modifier.size(AppDimens.MinimumTouchTarget)) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "بازگشت", tint = TextPrimary)
+            }
+        } else {
+            AppLogoMark(modifier = Modifier.size(46.dp))
+        }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -569,6 +583,7 @@ fun PremiumBottomNavigation(
             NavigationBarItem(
                 selected = selected,
                 onClick = { onNavigate(destination.route) },
+                alwaysShowLabel = false,
                 icon = { Icon(destination.icon, contentDescription = destination.label) },
                 label = {
                     Text(
@@ -803,6 +818,43 @@ fun DatePickerField(
 }
 
 @Composable
+fun LocalDateSelector(
+    label: String,
+    value: Long,
+    onValueChange: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        DarkOutlinedTextField(
+            value = PersianDateFormatter.format(value),
+            onValueChange = {},
+            label = label,
+            readOnly = true
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SecondaryGlassButton(
+                text = "روز قبل",
+                onClick = { onValueChange(PersianDateFormatter.shiftDays(value, -1)) },
+                modifier = Modifier.weight(1f),
+                accent = AppCyan
+            )
+            SecondaryGlassButton(
+                text = "امروز",
+                onClick = { onValueChange(PersianDateFormatter.todayStartMillis()) },
+                modifier = Modifier.weight(1f),
+                accent = Gold
+            )
+            SecondaryGlassButton(
+                text = "روز بعد",
+                onClick = { onValueChange(PersianDateFormatter.shiftDays(value, 1)) },
+                modifier = Modifier.weight(1f),
+                accent = AppCyan
+            )
+        }
+    }
+}
+
+@Composable
 fun MoneyField(
     value: String,
     onValueChange: (String) -> Unit,
@@ -973,8 +1025,12 @@ fun <T> AppDropdownField(
             readOnly = true,
             trailingIcon = {
                 Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, tint = TextMuted)
-            },
-            modifier = Modifier.clickable { expanded = true }
+            }
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clickable(enabled = options.isNotEmpty()) { expanded = true }
         )
         DropdownMenu(
             expanded = expanded,
