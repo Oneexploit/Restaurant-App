@@ -1,6 +1,5 @@
 package com.restaurant.offlinemanager.ui.home
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -58,9 +57,10 @@ import com.restaurant.offlinemanager.core.utils.NumberFormatter
 import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
 import com.restaurant.offlinemanager.data.local.entity.ProjectStatus
 import com.restaurant.offlinemanager.domain.model.InventoryItem
-import com.restaurant.offlinemanager.domain.model.MealDeliveryInput
 import com.restaurant.offlinemanager.domain.model.label
 import com.restaurant.offlinemanager.ui.AppUiState
+import java.time.Instant
+import java.time.ZoneId
 
 @Composable
 fun HomeScreen(
@@ -76,13 +76,14 @@ fun HomeScreen(
 ) {
     val stats = state.dashboard
     val today = PersianDateFormatter.todayStartMillis()
+    val lowStockAlertsEnabled = state.settings.lowStockNotificationsEnabled
     val activeProjects = state.projectFinances
         .filter { it.project.status == ProjectStatus.ACTIVE }
         .take(3)
     val todayMeals = state.snapshot.mealDeliveries
-        .filter { it.date == today }
+        .filter { it.date.isSameLocalDay(today) }
         .take(3)
-    val lowStock = state.inventory.filter { it.isLowStock }.take(4)
+    val lowStock = if (lowStockAlertsEnabled) state.inventory.filter { it.isLowStock }.take(4) else emptyList()
     val recentActivity = rememberHomeActivity(state)
 
     LazyColumn(
@@ -179,7 +180,11 @@ fun HomeScreen(
         item {
             SectionHeader("هشدارهای انبار")
         }
-        if (lowStock.isEmpty()) {
+        if (!lowStockAlertsEnabled) {
+            item {
+                EmptyState("هشدارهای کمبود خاموش است", "از تنظیمات می‌توانید نمایش هشدار کمبود موجودی را دوباره فعال کنید.")
+            }
+        } else if (lowStock.isEmpty()) {
             item {
                 EmptyState("همه چیز مرتب است", "هیچ کالایی زیر حداقل موجودی نیست.")
             }
@@ -240,27 +245,6 @@ private fun GoldPrimaryDashboardHint(onAddProject: () -> Unit) {
             icon = Icons.Outlined.Add,
             onClick = onAddProject
         )
-    }
-}
-
-@Composable
-private fun QuickActionCard(
-    label: String,
-    icon: ImageVector,
-    color: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    GlassCard(
-        modifier = modifier
-            .height(86.dp)
-            .clickable(onClick = onClick),
-        accent = color,
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)
-    ) {
-        Icon(icon, contentDescription = null, tint = color)
-        Spacer(Modifier.height(8.dp))
-        Text(label, color = TextPrimary, style = MaterialTheme.typography.labelLarge)
     }
 }
 
@@ -353,4 +337,11 @@ private fun RecentActivityRow(activity: HomeActivity) {
             }
         }
     }
+}
+
+private fun Long.isSameLocalDay(dayStartMillis: Long): Boolean {
+    val zone = ZoneId.systemDefault()
+    val thisDay = Instant.ofEpochMilli(this).atZone(zone).toLocalDate()
+    val targetDay = Instant.ofEpochMilli(dayStartMillis).atZone(zone).toLocalDate()
+    return thisDay == targetDay
 }

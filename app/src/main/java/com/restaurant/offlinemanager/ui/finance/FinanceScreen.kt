@@ -232,7 +232,7 @@ fun ProjectPaymentFormScreen(
     modifier: Modifier = Modifier
 ) {
     var project by remember { mutableStateOf(state.snapshot.projects.firstOrNull { it.id == preselectedProjectId } ?: state.snapshot.projects.firstOrNull()) }
-    var card by remember { mutableStateOf(state.snapshot.bankCards.firstOrNull()) }
+    var card by remember { mutableStateOf<BankCardEntity?>(state.snapshot.bankCards.firstOrNull()) }
     var amount by remember { mutableStateOf("") }
     var method by remember { mutableStateOf(PaymentMethod.BANK_TRANSFER) }
     var notes by remember { mutableStateOf("") }
@@ -265,12 +265,13 @@ fun ProjectPaymentFormScreen(
             error = when {
                 project == null -> "پروژه را انتخاب کنید"
                 value <= 0 -> "مبلغ باید بیشتر از صفر باشد"
-                remaining > 0 && value > remaining -> "مبلغ پرداختی بیشتر از مانده است"
+                value > remaining -> "مبلغ پرداختی بیشتر از مانده است"
+                method != PaymentMethod.CASH && card == null -> "برای پرداخت غیرنقدی کارت بانکی را انتخاب کنید"
                 else -> null
             }
             val p = project
             if (error == null && p != null) {
-                onSave(ProjectPaymentInput(p.id, card?.id, value, PersianDateFormatter.todayStartMillis(), method, notes))
+                onSave(ProjectPaymentInput(p.id, if (method == PaymentMethod.CASH) null else card?.id, value, PersianDateFormatter.todayStartMillis(), method, notes))
             }
         },
         modifier = modifier
@@ -284,7 +285,7 @@ fun SupplierPaymentFormScreen(
     modifier: Modifier = Modifier
 ) {
     var supplier by remember { mutableStateOf(state.snapshot.suppliers.firstOrNull()) }
-    var card by remember { mutableStateOf(state.snapshot.bankCards.firstOrNull()) }
+    var card by remember { mutableStateOf<BankCardEntity?>(state.snapshot.bankCards.firstOrNull()) }
     var amount by remember { mutableStateOf("") }
     var method by remember { mutableStateOf(PaymentMethod.CARD_TO_CARD) }
     var notes by remember { mutableStateOf("") }
@@ -317,12 +318,13 @@ fun SupplierPaymentFormScreen(
             error = when {
                 supplier == null -> "تامین‌کننده را انتخاب کنید"
                 value <= 0 -> "مبلغ باید بیشتر از صفر باشد"
-                remaining > 0 && value > remaining -> "مبلغ پرداختی بیشتر از مانده است"
+                value > remaining -> "مبلغ پرداختی بیشتر از مانده است"
+                method != PaymentMethod.CASH && card == null -> "برای پرداخت غیرنقدی کارت بانکی را انتخاب کنید"
                 else -> null
             }
             val s = supplier
             if (error == null && s != null) {
-                onSave(SupplierPaymentInput(s.id, card?.id, value, PersianDateFormatter.todayStartMillis(), method, notes))
+                onSave(SupplierPaymentInput(s.id, if (method == PaymentMethod.CASH) null else card?.id, value, PersianDateFormatter.todayStartMillis(), method, notes))
             }
         },
         modifier = modifier
@@ -373,8 +375,14 @@ private fun <T> PaymentFormLayout(
                 MoneyField(amount, onAmount, "مبلغ")
                 Spacer(Modifier.height(10.dp))
                 OptionSelector("روش پرداخت", PaymentMethod.entries, method, { it.label() }, onSelected = onMethod)
-                Spacer(Modifier.height(10.dp))
-                OptionSelector("کارت بانکی", cards, card, { it.title }, onSelected = onCard)
+                if (method != PaymentMethod.CASH) {
+                    Spacer(Modifier.height(10.dp))
+                    OptionSelector("کارت بانکی", cards, card, { it.title }, onSelected = onCard)
+                    if (cards.isEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text("برای پرداخت غیرنقدی ابتدا یک کارت بانکی اضافه کنید.", color = AppRed)
+                    }
+                }
                 Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(notes, onNotes, "توضیحات", singleLine = false)
             }
@@ -436,7 +444,7 @@ fun ExpenseFormScreen(
     var title by remember { mutableStateOf("") }
     var category by remember { mutableStateOf(ExpenseCategory.OTHER) }
     var amount by remember { mutableStateOf("") }
-    var card by remember { mutableStateOf(state.snapshot.bankCards.firstOrNull()) }
+    var card by remember { mutableStateOf<BankCardEntity?>(null) }
     var notes by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val now = PersianDateFormatter.nowMillis()
@@ -455,7 +463,7 @@ fun ExpenseFormScreen(
                 Spacer(Modifier.height(10.dp))
                 MoneyField(amount, { amount = it }, "مبلغ")
                 Spacer(Modifier.height(10.dp))
-                OptionSelector("کارت بانکی", state.snapshot.bankCards, card, { it.title }) { card = it }
+                OptionSelector("کارت بانکی (اختیاری)", state.snapshot.bankCards.filter { it.isActive }, card, { it.title }) { card = it }
                 Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false)
             }

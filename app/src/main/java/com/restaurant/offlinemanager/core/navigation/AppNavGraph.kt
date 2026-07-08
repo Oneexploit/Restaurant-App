@@ -31,6 +31,7 @@ import com.restaurant.offlinemanager.ui.projects.ProjectFormScreen
 import com.restaurant.offlinemanager.ui.projects.ProjectsListScreen
 import com.restaurant.offlinemanager.ui.purchases.PurchaseFormScreen
 import com.restaurant.offlinemanager.ui.purchases.PurchasesListScreen
+import com.restaurant.offlinemanager.ui.purchases.SupplierFormScreen
 import com.restaurant.offlinemanager.ui.reports.ReportsScreen
 import com.restaurant.offlinemanager.ui.search.SearchScreen
 import com.restaurant.offlinemanager.ui.settings.SettingsScreen
@@ -171,11 +172,25 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                 })
             }
             composable(Routes.PurchasesList) {
-                PurchasesListScreen(state, onAddPurchase = { navController.navigate(Routes.AddEditPurchase) })
+                PurchasesListScreen(
+                    state,
+                    onAddPurchase = { navController.navigate(Routes.AddEditPurchase) },
+                    onAddSupplier = { navController.navigate(Routes.AddSupplier) }
+                )
             }
             composable(Routes.AddEditPurchase) {
-                PurchaseFormScreen(state, onSave = {
-                    viewModel.savePurchase(it)
+                PurchaseFormScreen(
+                    state,
+                    onSave = {
+                        viewModel.savePurchase(it)
+                        navController.popBackStack()
+                    },
+                    onAddSupplier = { navController.navigate(Routes.AddSupplier) }
+                )
+            }
+            composable(Routes.AddSupplier) {
+                SupplierFormScreen(onSave = {
+                    viewModel.saveSupplier(it)
                     navController.popBackStack()
                 })
             }
@@ -226,8 +241,6 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                 SettingsScreen(
                     state = state,
                     context = context,
-                    onDarkMode = viewModel::setDarkMode,
-                    onAppLock = viewModel::setAppLock,
                     onLowStockNotifications = viewModel::setLowStockNotifications,
                     onExportBackup = viewModel::exportBackup,
                     onRestoreBackup = viewModel::restoreBackup
@@ -243,7 +256,7 @@ private fun bottomRouteFor(route: String?): String? =
         route.startsWith(Routes.Home) -> Routes.Home
         route.startsWith(Routes.ProjectsList) || route.startsWith(Routes.ProjectDetails) || route.startsWith(Routes.AddEditProject) || route.startsWith(Routes.MealDeliveryList) || route.startsWith(Routes.AddEditMealDelivery) -> Routes.ProjectsList
         route.startsWith(Routes.WarehousesList) || route.startsWith(Routes.AddStockIn) || route.startsWith(Routes.AddStockOut) || route.startsWith(Routes.TransferStock) || route.startsWith(Routes.AddEditWarehouse) || route.startsWith(Routes.AddEditMaterial) -> Routes.WarehousesList
-        route.startsWith(Routes.PurchasesList) || route.startsWith(Routes.AddEditPurchase) -> Routes.PurchasesList
+        route.startsWith(Routes.PurchasesList) || route.startsWith(Routes.AddEditPurchase) || route.startsWith(Routes.AddSupplier) -> Routes.PurchasesList
         route.startsWith(Routes.FinanceDashboard) || route.startsWith(Routes.AddProjectPayment) || route.startsWith(Routes.AddSupplierPayment) || route.startsWith(Routes.AddEditBankCard) || route.startsWith(Routes.AddExpense) -> Routes.FinanceDashboard
         route.startsWith(Routes.Reports) -> Routes.Reports
         else -> null
@@ -263,6 +276,7 @@ private fun titleFor(route: String?): String =
         route.startsWith(Routes.AddEditWarehouse) -> "فرم انبار"
         route.startsWith(Routes.AddEditMaterial) -> "فرم متریال"
         route.startsWith(Routes.PurchasesList) || route.startsWith(Routes.AddEditPurchase) -> "خرید روزانه"
+        route.startsWith(Routes.AddSupplier) -> "تامین‌کننده"
         route.startsWith(Routes.FinanceDashboard) -> "مالی"
         route.startsWith(Routes.AddProjectPayment) -> "دریافت پروژه"
         route.startsWith(Routes.AddSupplierPayment) -> "پرداخت تامین‌کننده"

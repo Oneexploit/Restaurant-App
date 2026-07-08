@@ -33,15 +33,12 @@ import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Inventory
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Menu
-import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -207,9 +204,6 @@ fun PremiumTopBar(
         }
         IconButton(onClick = onOpenSearch, modifier = Modifier.size(AppDimens.MinimumTouchTarget)) {
             Icon(Icons.Outlined.Search, contentDescription = "جستجو", tint = TextSecondary)
-        }
-        IconButton(onClick = { }, modifier = Modifier.size(AppDimens.MinimumTouchTarget)) {
-            Icon(Icons.Outlined.Notifications, contentDescription = "اعلان ها", tint = Gold)
         }
         IconButton(onClick = onOpenSettings, modifier = Modifier.size(AppDimens.MinimumTouchTarget)) {
             Icon(Icons.Outlined.Menu, contentDescription = "منو", tint = TextPrimary)
@@ -602,16 +596,23 @@ fun StatusChip(
     color: Color,
     modifier: Modifier = Modifier
 ) {
-    AssistChip(
-        modifier = modifier.heightIn(min = 34.dp),
-        onClick = {},
-        label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        colors = AssistChipDefaults.assistChipColors(
-            containerColor = color.copy(alpha = 0.14f),
-            labelColor = color
-        ),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.35f))
-    )
+    Box(
+        modifier = modifier
+            .heightIn(min = 34.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(color.copy(alpha = 0.14f))
+            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
+            .padding(horizontal = 11.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            color = color,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
 
 @Composable

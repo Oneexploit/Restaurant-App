@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.restaurant.offlinemanager.core.design.AppCyan
 import com.restaurant.offlinemanager.core.design.AppGreen
@@ -56,6 +57,7 @@ import com.restaurant.offlinemanager.core.utils.NumberFormatter
 import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
 import com.restaurant.offlinemanager.data.local.entity.MaterialEntity
 import com.restaurant.offlinemanager.data.local.entity.PurchasePaymentType
+import com.restaurant.offlinemanager.data.local.entity.SupplierEntity
 import com.restaurant.offlinemanager.domain.model.PurchaseInput
 import com.restaurant.offlinemanager.domain.model.PurchaseItemInput
 import com.restaurant.offlinemanager.domain.model.label
@@ -65,6 +67,7 @@ import com.restaurant.offlinemanager.ui.AppUiState
 fun PurchasesListScreen(
     state: AppUiState,
     onAddPurchase: () -> Unit,
+    onAddSupplier: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var query by remember { mutableStateOf("") }
@@ -99,6 +102,7 @@ fun PurchasesListScreen(
             }
         }
         item { GoldPrimaryButton("ثبت فاکتور خرید", onClick = onAddPurchase, icon = Icons.Outlined.ShoppingCart) }
+        item { GoldPrimaryButton("افزودن تامین‌کننده", onClick = onAddSupplier, icon = Icons.Outlined.Add) }
         if (purchases.isEmpty()) {
             item { EmptyState("خریدی پیدا نشد", "برای شروع یک فاکتور روزانه ثبت کنید.") }
         } else {
@@ -132,6 +136,7 @@ fun PurchasesListScreen(
 fun PurchaseFormScreen(
     state: AppUiState,
     onSave: (PurchaseInput) -> Unit,
+    onAddSupplier: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val suppliers = state.snapshot.suppliers.filter { it.isActive }
@@ -147,13 +152,22 @@ fun PurchaseFormScreen(
     var error by remember { mutableStateOf<String?>(null) }
     val rows = remember { mutableStateListOf(PurchaseRow()) }
 
+    val activeMaterials = state.snapshot.materials.filter { it.isActive }
     val inputs = rows.mapNotNull { row ->
-        val material = state.snapshot.materials.firstOrNull { it.id == row.materialId }
+        val material = activeMaterials.firstOrNull { it.id == row.materialId }
         val qty = NumberFormatter.normalizeDigits(row.quantity).toDoubleOrNull() ?: 0.0
         val price = MoneyFormatter.parse(row.unitPrice)
         if (material != null && qty > 0 && price > 0) PurchaseItemInput(material.id, qty, material.mainUnit, price) else null
     }
-    val total = (inputs.sumOf { it.totalAmount } - MoneyFormatter.parse(discount)).coerceAtLeast(0)
+    val hasIncompleteRows = rows.any { row ->
+        val touched = row.materialId != null || row.quantity.isNotBlank() || row.unitPrice.isNotBlank()
+        val qty = NumberFormatter.normalizeDigits(row.quantity).toDoubleOrNull() ?: 0.0
+        val price = MoneyFormatter.parse(row.unitPrice)
+        touched && (row.materialId == null || qty <= 0.0 || price <= 0)
+    }
+    val subtotal = inputs.sumOf { it.totalAmount }
+    val discountAmount = MoneyFormatter.parse(discount)
+    val total = (subtotal - discountAmount).coerceAtLeast(0)
 
     LazyColumn(
         modifier = modifier
@@ -165,6 +179,8 @@ fun PurchaseFormScreen(
         item {
             GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
                 OptionSelector("تامین‌کننده", suppliers, supplier, { it.name }) { supplier = it }
+                Spacer(Modifier.height(10.dp))
+                GoldPrimaryButton("افزودن تامین‌کننده", onClick = onAddSupplier, icon = Icons.Outlined.Add)
                 Spacer(Modifier.height(10.dp))
                 OptionSelector("انبار مقصد", warehouses, warehouse, { it.name }) { warehouse = it }
                 Spacer(Modifier.height(10.dp))
@@ -191,13 +207,14 @@ fun PurchaseFormScreen(
         item { SectionHeader("آیتم‌های فاکتور") }
         items(rows, key = { it.localId }) { row ->
             PurchaseItemRow(
-                materials = state.snapshot.materials.filter { it.isActive },
+                materials = activeMaterials,
                 row = row,
                 onChange = { updated ->
                     val index = rows.indexOfFirst { it.localId == row.localId }
                     if (index >= 0) rows[index] = updated
                 },
-                onRemove = { if (rows.size > 1) rows.remove(row) }
+                canRemove = rows.size > 1,
+                onRemove = { rows.remove(row) }
             )
         }
         item { GoldPrimaryButton("افزودن آیتم", onClick = { rows.add(PurchaseRow()) }, icon = Icons.Outlined.Add) }
@@ -218,7 +235,10 @@ fun PurchaseFormScreen(
                 onClick = {
                     error = when {
                         warehouse == null -> "انبار مقصد را انتخاب کنید"
+                        paymentType == PurchasePaymentType.CREDIT && supplier == null -> "برای خرید نسیه باید تامین‌کننده را انتخاب کنید"
                         inputs.isEmpty() -> "حداقل یک آیتم معتبر وارد کنید"
+                        hasIncompleteRows -> "همه ردیف‌های تکمیل‌شده باید متریال، مقدار و قیمت معتبر داشته باشند"
+                        discountAmount > subtotal -> "تخفیف نمی‌تواند بیشتر از جمع آیتم‌ها باشد"
                         paymentType == PurchasePaymentType.CARD && card == null -> "کارت بانکی را انتخاب کنید"
                         else -> null
                     }
@@ -232,7 +252,7 @@ fun PurchaseFormScreen(
                                 invoiceNumber = invoice,
                                 paymentType = paymentType,
                                 bankCardId = if (paymentType == PurchasePaymentType.CARD) card?.id else null,
-                                discountAmount = MoneyFormatter.parse(discount),
+                                discountAmount = discountAmount,
                                 notes = notes,
                                 items = inputs
                             )
@@ -250,6 +270,7 @@ private fun PurchaseItemRow(
     materials: List<MaterialEntity>,
     row: PurchaseRow,
     onChange: (PurchaseRow) -> Unit,
+    canRemove: Boolean,
     onRemove: () -> Unit
 ) {
     val selected = materials.firstOrNull { it.id == row.materialId }
@@ -266,8 +287,10 @@ private fun PurchaseItemRow(
                 }
                 Text("واحد: ${selected?.mainUnit?.label() ?: "-"}", color = TextSecondary)
             }
-            IconButton(onClick = onRemove) {
-                Icon(Icons.Outlined.Delete, contentDescription = "حذف", tint = AppRed)
+            if (canRemove) {
+                IconButton(onClick = onRemove) {
+                    Icon(Icons.Outlined.Delete, contentDescription = "حذف", tint = AppRed)
+                }
             }
         }
     }
@@ -279,3 +302,60 @@ private data class PurchaseRow(
     val quantity: String = "",
     val unitPrice: String = ""
 )
+
+@Composable
+fun SupplierFormScreen(
+    onSave: (SupplierEntity) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var address by remember { mutableStateOf("") }
+    var notes by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    val now = PersianDateFormatter.nowMillis()
+
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item { SectionHeader("افزودن تامین‌کننده") }
+        item {
+            GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
+                DarkOutlinedTextField(name, { name = it }, "نام تامین‌کننده")
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(phone, { phone = it }, "شماره تماس", keyboardType = KeyboardType.Phone)
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(address, { address = it }, "آدرس", singleLine = false)
+                Spacer(Modifier.height(10.dp))
+                DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false)
+            }
+        }
+        if (error != null) item { Text(error.orEmpty(), color = AppRed) }
+        item {
+            GoldPrimaryButton(
+                text = "ذخیره تامین‌کننده",
+                onClick = {
+                    error = if (name.isBlank()) "نام تامین‌کننده الزامی است" else null
+                    if (error == null) {
+                        onSave(
+                            SupplierEntity(
+                                name = name,
+                                phone = phone,
+                                address = address,
+                                notes = notes,
+                                isActive = true,
+                                createdAt = now,
+                                updatedAt = now
+                            )
+                        )
+                    }
+                },
+                icon = Icons.Outlined.Save
+            )
+        }
+        item { Spacer(Modifier.height(20.dp)) }
+    }
+}

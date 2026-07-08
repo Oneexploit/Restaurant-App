@@ -88,9 +88,4 @@ Expense enum: `RENT`, `SALARY`, `TRANSPORT`, `BILLS`, `REPAIR`, `OTHER`.
 
 `app_settings` stores:
 
-- `darkMode`
-- `currency`
-- `language`
-- `appLockEnabled`
 - `lowStockNotificationsEnabled`
-- `defaultWarehouseId`

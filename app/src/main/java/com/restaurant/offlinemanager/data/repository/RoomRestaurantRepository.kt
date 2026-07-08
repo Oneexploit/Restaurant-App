@@ -106,6 +106,9 @@ class RoomRestaurantRepository(
         )
 
     override suspend fun saveProject(input: ProjectInput): Long {
+        require(input.name.isNotBlank()) { "نام پروژه الزامی است" }
+        require(input.workerCount > 0) { "تعداد نفرات باید بیشتر از صفر باشد" }
+        require(input.mealPrice > 0) { "قیمت هر وعده باید بیشتر از صفر باشد" }
         val now = PersianDateFormatter.nowMillis()
         val existing = if (input.id == 0L) null else dao.getProject(input.id)
         return dao.insertProject(input.toEntity(existing?.createdAt ?: now, now))
@@ -121,6 +124,8 @@ class RoomRestaurantRepository(
         runCatching {
             require(input.quantity > 0) { "تعداد وعده باید بیشتر از صفر باشد" }
             require(input.unitPrice > 0) { "قیمت واحد باید بیشتر از صفر باشد" }
+            val project = dao.getProject(input.projectId) ?: error("پروژه پیدا نشد")
+            require(project.status != ProjectStatus.ARCHIVED) { "ثبت وعده برای پروژه آرشیوشده مجاز نیست" }
             val now = PersianDateFormatter.nowMillis()
             dao.insertMealDelivery(
                 MealDeliveryEntity(
@@ -137,59 +142,131 @@ class RoomRestaurantRepository(
             )
         }
 
-    override suspend fun saveWarehouse(entity: WarehouseEntity): Long =
-        dao.insertWarehouse(entity.copy(updatedAt = PersianDateFormatter.nowMillis()))
+    override suspend fun saveWarehouse(entity: WarehouseEntity): Long {
+        require(entity.name.isNotBlank()) { "نام انبار الزامی است" }
+        val now = PersianDateFormatter.nowMillis()
+        return dao.insertWarehouse(
+            entity.copy(
+                name = entity.name.trim(),
+                address = entity.address?.trim()?.ifBlank { null },
+                notes = entity.notes?.trim()?.ifBlank { null },
+                createdAt = entity.createdAt.takeIf { it > 0 } ?: now,
+                updatedAt = now
+            )
+        )
+    }
 
-    override suspend fun saveMaterial(entity: MaterialEntity): Long =
-        dao.insertMaterial(entity.copy(updatedAt = PersianDateFormatter.nowMillis()))
+    override suspend fun saveMaterial(entity: MaterialEntity): Long {
+        require(entity.name.isNotBlank()) { "نام متریال الزامی است" }
+        require(entity.minimumStock >= 0.0) { "حداقل موجودی نمی‌تواند منفی باشد" }
+        val now = PersianDateFormatter.nowMillis()
+        return dao.insertMaterial(
+            entity.copy(
+                name = entity.name.trim(),
+                notes = entity.notes?.trim()?.ifBlank { null },
+                imageEmoji = entity.imageEmoji?.trim()?.ifBlank { null },
+                createdAt = entity.createdAt.takeIf { it > 0 } ?: now,
+                updatedAt = now
+            )
+        )
+    }
 
-    override suspend fun saveSupplier(entity: SupplierEntity): Long =
-        dao.insertSupplier(entity.copy(updatedAt = PersianDateFormatter.nowMillis()))
+    override suspend fun saveSupplier(entity: SupplierEntity): Long {
+        require(entity.name.isNotBlank()) { "نام تامین‌کننده الزامی است" }
+        val now = PersianDateFormatter.nowMillis()
+        return dao.insertSupplier(
+            entity.copy(
+                name = entity.name.trim(),
+                phone = entity.phone?.trim()?.ifBlank { null },
+                address = entity.address?.trim()?.ifBlank { null },
+                notes = entity.notes?.trim()?.ifBlank { null },
+                createdAt = entity.createdAt.takeIf { it > 0 } ?: now,
+                updatedAt = now
+            )
+        )
+    }
 
     override suspend fun saveStockTransaction(input: StockTransactionInput): Result<Long> =
+        runCatching { insertStockTransaction(input) }
+
+    override suspend fun saveStockTransactions(inputs: List<StockTransactionInput>): Result<List<Long>> =
         runCatching {
-            require(input.quantity != 0.0) { "مقدار کالا نمی‌تواند صفر باشد" }
-            require(input.type == StockTransactionType.ADJUSTMENT || input.quantity > 0.0) {
-                "مقدار منفی فقط برای اصلاح موجودی مجاز است"
+            require(inputs.isNotEmpty()) { "حداقل یک تراکنش انبار باید ثبت شود" }
+            database.withTransaction {
+                inputs.map { insertStockTransaction(it) }
             }
-            val snapshot = currentSnapshot()
-            val available = InventoryUseCase(this).availableStock(snapshot, input.warehouseId, input.materialId)
-            val outgoing = input.type == StockTransactionType.OUT ||
-                input.type == StockTransactionType.TRANSFER_OUT ||
-                input.type == StockTransactionType.WASTE
-            require(!outgoing || input.quantity <= available) {
-                "موجودی کافی نیست. موجودی فعلی: $available"
-            }
-            val now = PersianDateFormatter.nowMillis()
-            dao.insertStockTransaction(
-                StockTransactionEntity(
-                    warehouseId = input.warehouseId,
-                    materialId = input.materialId,
-                    projectId = input.projectId,
-                    supplierId = input.supplierId,
-                    type = input.type,
-                    reason = input.reason,
-                    quantity = input.quantity,
-                    unit = input.unit,
-                    unitPrice = input.unitPrice,
-                    totalAmount = input.unitPrice?.let { (it * input.quantity).toLong() },
-                    date = input.date,
-                    notes = input.notes?.ifBlank { null },
-                    createdAt = now,
-                    updatedAt = now
-                )
-            )
         }
+
+    private suspend fun insertStockTransaction(input: StockTransactionInput): Long {
+        require(input.quantity != 0.0) { "مقدار کالا نمی‌تواند صفر باشد" }
+        require(input.type == StockTransactionType.ADJUSTMENT || input.quantity > 0.0) {
+            "مقدار منفی فقط برای اصلاح موجودی مجاز است"
+        }
+        val snapshot = currentSnapshot()
+        require(snapshot.warehouses.any { it.id == input.warehouseId && it.isActive }) {
+            "انبار انتخاب‌شده معتبر نیست"
+        }
+        val material = snapshot.materials.firstOrNull { it.id == input.materialId && it.isActive }
+            ?: error("متریال انتخاب‌شده معتبر نیست")
+        require(input.unit == material.mainUnit) { "واحد تراکنش با واحد اصلی متریال سازگار نیست" }
+        val available = InventoryUseCase(this).availableStock(snapshot, input.warehouseId, input.materialId)
+        val outgoing = input.type == StockTransactionType.OUT ||
+            input.type == StockTransactionType.TRANSFER_OUT ||
+            input.type == StockTransactionType.WASTE
+        require(!outgoing || input.quantity <= available) {
+            "موجودی کافی نیست. موجودی فعلی: $available"
+        }
+        val now = PersianDateFormatter.nowMillis()
+        return dao.insertStockTransaction(
+            StockTransactionEntity(
+                warehouseId = input.warehouseId,
+                materialId = input.materialId,
+                projectId = input.projectId,
+                supplierId = input.supplierId,
+                type = input.type,
+                reason = input.reason,
+                quantity = input.quantity,
+                unit = input.unit,
+                unitPrice = input.unitPrice,
+                totalAmount = input.unitPrice?.let { (it * input.quantity).toLong() },
+                date = input.date,
+                notes = input.notes?.ifBlank { null },
+                createdAt = now,
+                updatedAt = now
+            )
+        )
+    }
 
     override suspend fun savePurchase(input: PurchaseInput): Result<Long> =
         runCatching {
             require(input.items.isNotEmpty()) { "فاکتور باید حداقل یک آیتم داشته باشد" }
             require(input.discountAmount >= 0) { "تخفیف نمی‌تواند منفی باشد" }
             require(input.items.all { it.quantity > 0 && it.unitPrice > 0 }) { "مقدار و قیمت همه آیتم‌ها باید مثبت باشد" }
+            val subtotal = input.items.sumOf { it.totalAmount }
+            require(input.discountAmount <= subtotal) { "تخفیف نمی‌تواند بیشتر از جمع آیتم‌ها باشد" }
+            val snapshot = currentSnapshot()
+            require(snapshot.warehouses.any { it.id == input.warehouseId && it.isActive }) {
+                "انبار مقصد معتبر نیست"
+            }
+            input.supplierId?.let { supplierId ->
+                require(snapshot.suppliers.any { it.id == supplierId && it.isActive }) { "تامین‌کننده معتبر نیست" }
+            }
+            require(input.paymentType != PurchasePaymentType.CREDIT || input.supplierId != null) {
+                "برای خرید نسیه باید تامین‌کننده انتخاب شود"
+            }
+            val normalizedCardId = if (input.paymentType == PurchasePaymentType.CARD) input.bankCardId else null
+            require(input.paymentType != PurchasePaymentType.CARD || normalizedCardId != null) {
+                "برای خرید کارتی باید کارت بانکی انتخاب شود"
+            }
+            normalizedCardId?.let { cardId ->
+                require(snapshot.bankCards.any { it.id == cardId && it.isActive }) { "کارت بانکی معتبر نیست" }
+            }
+            require(input.items.all { item -> snapshot.materials.any { it.id == item.materialId && it.isActive && it.mainUnit == item.unit } }) {
+                "همه آیتم‌های فاکتور باید متریال فعال و واحد معتبر داشته باشند"
+            }
             database.withTransaction {
                 val now = PersianDateFormatter.nowMillis()
-                val subtotal = input.items.sumOf { it.totalAmount }
-                val total = (subtotal - input.discountAmount).coerceAtLeast(0)
+                val total = subtotal - input.discountAmount
                 val paid = if (input.paymentType == PurchasePaymentType.CREDIT) 0 else total
                 val purchaseId = dao.insertPurchase(
                     PurchaseEntity(
@@ -198,7 +275,7 @@ class RoomRestaurantRepository(
                         date = input.date,
                         invoiceNumber = input.invoiceNumber?.ifBlank { null },
                         paymentType = input.paymentType,
-                        bankCardId = input.bankCardId,
+                        bankCardId = normalizedCardId,
                         discountAmount = input.discountAmount,
                         totalAmount = total,
                         paidAmount = paid,
@@ -243,16 +320,37 @@ class RoomRestaurantRepository(
             }
         }
 
-    override suspend fun saveBankCard(entity: BankCardEntity): Long =
-        dao.insertBankCard(entity.copy(updatedAt = PersianDateFormatter.nowMillis()))
+    override suspend fun saveBankCard(entity: BankCardEntity): Long {
+        require(entity.title.isNotBlank()) { "عنوان کارت الزامی است" }
+        require(entity.initialBalance >= 0) { "موجودی اولیه نمی‌تواند منفی باشد" }
+        val now = PersianDateFormatter.nowMillis()
+        return dao.insertBankCard(
+            entity.copy(
+                title = entity.title.trim(),
+                ownerName = entity.ownerName?.trim()?.ifBlank { null },
+                bankName = entity.bankName?.trim()?.ifBlank { null },
+                cardNumber = entity.cardNumber?.filter { it.isDigit() }?.ifBlank { null },
+                notes = entity.notes?.trim()?.ifBlank { null },
+                createdAt = entity.createdAt.takeIf { it > 0 } ?: now,
+                updatedAt = now
+            )
+        )
+    }
 
     override suspend fun saveProjectPayment(input: ProjectPaymentInput): Result<Long> =
         runCatching {
             require(input.amount > 0) { "مبلغ پرداخت باید بیشتر از صفر باشد" }
             val snapshot = currentSnapshot()
+            require(snapshot.projects.any { it.id == input.projectId }) { "پروژه معتبر نیست" }
+            require(input.method == PaymentMethod.CASH || input.bankCardId != null) {
+                "برای دریافت غیرنقدی باید کارت بانکی انتخاب شود"
+            }
+            input.bankCardId?.let { cardId ->
+                require(snapshot.bankCards.any { it.id == cardId && it.isActive }) { "کارت بانکی معتبر نیست" }
+            }
             val finance = ProjectFinanceUseCase(this).calculateProjectFinances(snapshot)
                 .firstOrNull { it.project.id == input.projectId }
-            require(finance == null || input.amount <= finance.receivable) {
+            require(finance != null && input.amount <= finance.receivable) {
                 "مبلغ دریافت بیشتر از مانده مطالبات است"
             }
             val now = PersianDateFormatter.nowMillis()
@@ -274,9 +372,16 @@ class RoomRestaurantRepository(
         runCatching {
             require(input.amount > 0) { "مبلغ پرداخت باید بیشتر از صفر باشد" }
             val snapshot = currentSnapshot()
+            require(snapshot.suppliers.any { it.id == input.supplierId && it.isActive }) { "تامین‌کننده معتبر نیست" }
+            require(input.method == PaymentMethod.CASH || input.bankCardId != null) {
+                "برای پرداخت غیرنقدی باید کارت بانکی انتخاب شود"
+            }
+            input.bankCardId?.let { cardId ->
+                require(snapshot.bankCards.any { it.id == cardId && it.isActive }) { "کارت بانکی معتبر نیست" }
+            }
             val debt = SupplierDebtUseCase(this).calculateSupplierDebts(snapshot)
                 .firstOrNull { it.supplier.id == input.supplierId }
-            require(debt == null || input.amount <= debt.remaining) {
+            require(debt != null && input.amount <= debt.remaining) {
                 "مبلغ پرداخت بیشتر از بدهی تامین‌کننده است"
             }
             val now = PersianDateFormatter.nowMillis()
@@ -295,8 +400,20 @@ class RoomRestaurantRepository(
         }
 
     override suspend fun saveExpense(entity: ExpenseEntity): Long {
+        require(entity.title.isNotBlank()) { "عنوان هزینه الزامی است" }
         require(entity.amount > 0) { "مبلغ هزینه باید بیشتر از صفر باشد" }
-        return dao.insertExpense(entity.copy(updatedAt = PersianDateFormatter.nowMillis()))
+        entity.bankCardId?.let { cardId ->
+            require(currentSnapshot().bankCards.any { it.id == cardId && it.isActive }) { "کارت بانکی معتبر نیست" }
+        }
+        val now = PersianDateFormatter.nowMillis()
+        return dao.insertExpense(
+            entity.copy(
+                title = entity.title.trim(),
+                notes = entity.notes?.trim()?.ifBlank { null },
+                createdAt = entity.createdAt.takeIf { it > 0 } ?: now,
+                updatedAt = now
+            )
+        )
     }
 
     override suspend fun exportBackup(context: Context): File {

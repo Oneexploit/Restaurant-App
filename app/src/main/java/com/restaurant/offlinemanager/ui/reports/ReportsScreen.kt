@@ -55,8 +55,8 @@ fun ReportsScreen(
     modifier: Modifier = Modifier
 ) {
     val bestProject = state.projectFinances.maxByOrNull { it.totalDelivered }
-    val topDebtorProject = state.projectFinances.maxByOrNull { it.receivable }
-    val topSupplierDebt = state.supplierDebts.maxByOrNull { it.remaining }
+    val topDebtorProject = state.projectFinances.filter { it.receivable > 0 }.maxByOrNull { it.receivable }
+    val topSupplierDebt = state.supplierDebts.filter { it.remaining > 0 }.maxByOrNull { it.remaining }
     val lowStock = state.inventory.filter { it.isLowStock }.take(3)
     LazyColumn(
         modifier = modifier

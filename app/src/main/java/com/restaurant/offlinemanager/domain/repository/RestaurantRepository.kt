@@ -27,6 +27,7 @@ interface RestaurantRepository {
     suspend fun saveMaterial(entity: MaterialEntity): Long
     suspend fun saveSupplier(entity: SupplierEntity): Long
     suspend fun saveStockTransaction(input: StockTransactionInput): Result<Long>
+    suspend fun saveStockTransactions(inputs: List<StockTransactionInput>): Result<List<Long>>
     suspend fun savePurchase(input: PurchaseInput): Result<Long>
     suspend fun saveBankCard(entity: BankCardEntity): Long
     suspend fun saveProjectPayment(input: ProjectPaymentInput): Result<Long>

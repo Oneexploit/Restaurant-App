@@ -110,7 +110,7 @@ class RestaurantViewModel(
     }
 
     fun saveStockTransactions(inputs: List<StockTransactionInput>) = ioAction("تراکنش‌های انبار ثبت شد") {
-        inputs.forEach { repository.saveStockTransaction(it).getOrThrow() }
+        repository.saveStockTransactions(inputs).getOrThrow()
     }
 
     fun savePurchase(input: PurchaseInput) = ioAction("فاکتور خرید ثبت شد") {
@@ -131,14 +131,6 @@ class RestaurantViewModel(
 
     fun saveExpense(entity: ExpenseEntity) = ioAction("هزینه ثبت شد") {
         repository.saveExpense(entity)
-    }
-
-    fun setDarkMode(enabled: Boolean) = ioAction("تنظیمات ذخیره شد") {
-        settingsRepository.setDarkMode(enabled)
-    }
-
-    fun setAppLock(enabled: Boolean) = ioAction("تنظیمات امنیت ذخیره شد") {
-        settingsRepository.setAppLock(enabled)
     }
 
     fun setLowStockNotifications(enabled: Boolean) = ioAction("تنظیمات هشدار ذخیره شد") {

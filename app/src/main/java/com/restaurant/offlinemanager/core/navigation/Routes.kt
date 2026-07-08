@@ -27,6 +27,7 @@ object Routes {
     const val TransferStock = "transferStock"
     const val PurchasesList = "purchases"
     const val AddEditPurchase = "addEditPurchase"
+    const val AddSupplier = "addSupplier"
     const val FinanceDashboard = "finance"
     const val BankCards = "bankCards"
     const val AddEditBankCard = "addEditBankCard"

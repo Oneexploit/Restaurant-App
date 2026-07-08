@@ -44,8 +44,6 @@ import com.restaurant.offlinemanager.ui.AppUiState
 fun SettingsScreen(
     state: AppUiState,
     context: Context,
-    onDarkMode: (Boolean) -> Unit,
-    onAppLock: (Boolean) -> Unit,
     onLowStockNotifications: (Boolean) -> Unit,
     onExportBackup: (Context) -> Unit,
     onRestoreBackup: (Context, Uri) -> Unit,
@@ -63,16 +61,6 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { SectionHeader("تنظیمات") }
-        item {
-            SettingsSection("ظاهر برنامه") {
-                SettingSwitch(
-                    title = "حالت تاریک",
-                    subtitle = "طراحی اصلی برنامه همیشه تیره و لوکس است.",
-                    checked = state.settings.darkMode,
-                    onCheckedChange = onDarkMode
-                )
-            }
-        }
         item {
             SettingsSection("اطلاعات کسب‌وکار") {
                 Text("مدیریت غذای شرکتی و رستوران آفلاین", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
@@ -93,13 +81,8 @@ fun SettingsScreen(
         }
         item {
             SettingsSection("امنیت") {
-                SettingSwitch(
-                    title = "قفل برنامه",
-                    subtitle = "قفل محلی برنامه برای نسخه آفلاین.",
-                    checked = state.settings.appLockEnabled,
-                    onCheckedChange = onAppLock
-                )
                 Text("شماره کارت‌ها در همه بخش‌ها ماسک می‌شوند.", color = TextMuted)
+                Text("داده‌ها فقط در حافظه محلی دستگاه ذخیره می‌شوند و بکاپ ابری سیستم غیرفعال است.", color = TextSecondary)
             }
         }
         item {

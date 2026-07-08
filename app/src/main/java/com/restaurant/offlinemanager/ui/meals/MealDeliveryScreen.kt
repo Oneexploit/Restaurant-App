@@ -45,6 +45,7 @@ import com.restaurant.offlinemanager.core.utils.NumberFormatter
 import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
 import com.restaurant.offlinemanager.data.local.entity.MealType
 import com.restaurant.offlinemanager.data.local.entity.ProjectEntity
+import com.restaurant.offlinemanager.data.local.entity.ProjectStatus
 import com.restaurant.offlinemanager.domain.model.MealDeliveryInput
 import com.restaurant.offlinemanager.domain.model.label
 import com.restaurant.offlinemanager.ui.AppUiState
@@ -94,7 +95,7 @@ fun MealDeliveryFormScreen(
     onSave: (MealDeliveryInput) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val projects = state.snapshot.projects.filter { it.status.name != "ARCHIVED" }
+    val projects = state.snapshot.projects.filter { it.status != ProjectStatus.ARCHIVED }
     var projectQuery by remember { mutableStateOf("") }
     val filteredProjects = projects.filter {
         projectQuery.isBlank() ||
@@ -128,7 +129,11 @@ fun MealDeliveryFormScreen(
         item { SectionHeader("ثبت وعده") }
         item { AppSearchBar(projectQuery, { projectQuery = it }, label = "جستجوی پروژه") }
         item {
-            OptionSelector("انتخاب پروژه", filteredProjects, selectedProject, { "${it.name} • ${it.workerCount} نفر" }) { selectedProject = it }
+            OptionSelector("انتخاب پروژه", filteredProjects, selectedProject, { "${it.name} • ${it.workerCount} نفر" }) {
+                selectedProject = it
+                quantity = it.workerCount.toString()
+                unitPrice = it.mealPrice.toString()
+            }
         }
         item {
             FilterChipRow(

@@ -44,7 +44,7 @@ Run unit tests:
 - Stock in, stock out, transfer, waste, and adjustment forms.
 - Local CSV export for purchases, inventory, receivables, supplier debts, and payments.
 - Local JSON backup and restore for all Room tables.
-- DataStore settings for dark mode, app lock, low stock notifications, and default warehouse.
+- DataStore setting for local low-stock warning visibility.
 
 ## Database Overview
 

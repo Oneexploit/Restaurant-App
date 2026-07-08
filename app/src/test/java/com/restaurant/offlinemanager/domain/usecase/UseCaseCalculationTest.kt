@@ -165,6 +165,7 @@ private class FakeRepository(private val snapshot: RestaurantSnapshot) : Restaur
     override suspend fun saveMaterial(entity: MaterialEntity): Long = unsupported()
     override suspend fun saveSupplier(entity: SupplierEntity): Long = unsupported()
     override suspend fun saveStockTransaction(input: StockTransactionInput): Result<Long> = unsupported()
+    override suspend fun saveStockTransactions(inputs: List<StockTransactionInput>): Result<List<Long>> = unsupported()
     override suspend fun savePurchase(input: PurchaseInput): Result<Long> = unsupported()
     override suspend fun saveBankCard(entity: BankCardEntity): Long = unsupported()
     override suspend fun saveProjectPayment(input: ProjectPaymentInput): Result<Long> = unsupported()

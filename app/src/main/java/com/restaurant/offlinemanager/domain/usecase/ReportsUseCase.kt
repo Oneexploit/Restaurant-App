@@ -37,43 +37,43 @@ class ReportsUseCase(
     }
 
     fun purchasesCsv(snapshot: RestaurantSnapshot): String = buildString {
-        appendLine("date,supplier,invoice,payment,total,paid")
+        appendLine(csvRow("date", "supplier", "invoice", "payment", "total", "paid"))
         snapshot.purchases.forEach { purchase ->
             val supplier = snapshot.suppliers.firstOrNull { it.id == purchase.supplierId }?.name.orEmpty()
-            appendLine("${PersianDateFormatter.format(purchase.date)},$supplier,${purchase.invoiceNumber.orEmpty()},${purchase.paymentType.label()},${purchase.totalAmount},${purchase.paidAmount}")
+            appendLine(csvRow(PersianDateFormatter.format(purchase.date), supplier, purchase.invoiceNumber.orEmpty(), purchase.paymentType.label(), purchase.totalAmount, purchase.paidAmount))
         }
     }
 
     fun inventoryCsv(snapshot: RestaurantSnapshot): String = buildString {
-        appendLine("warehouse,material,quantity,unit,value,status")
+        appendLine(csvRow("warehouse", "material", "quantity", "unit", "value", "status"))
         inventoryUseCase.calculateInventory(snapshot).forEach { item ->
-            appendLine("${item.warehouseName},${item.materialName},${item.quantity},${item.unit.label()},${item.approximateValue},${if (item.isLowStock) "low" else "normal"}")
+            appendLine(csvRow(item.warehouseName, item.materialName, item.quantity, item.unit.label(), item.approximateValue, if (item.isLowStock) "low" else "normal"))
         }
     }
 
     fun receivablesCsv(snapshot: RestaurantSnapshot): String = buildString {
-        appendLine("project,total_delivered,paid,remaining")
+        appendLine(csvRow("project", "total_delivered", "paid", "remaining"))
         projectFinanceUseCase.calculateProjectFinances(snapshot).forEach {
-            appendLine("${it.project.name},${it.totalDelivered},${it.totalPaid},${it.receivable}")
+            appendLine(csvRow(it.project.name, it.totalDelivered, it.totalPaid, it.receivable))
         }
     }
 
     fun supplierDebtsCsv(snapshot: RestaurantSnapshot): String = buildString {
-        appendLine("supplier,credit_purchases,paid,remaining")
+        appendLine(csvRow("supplier", "credit_purchases", "paid", "remaining"))
         supplierDebtUseCase.calculateSupplierDebts(snapshot).forEach {
-            appendLine("${it.supplier.name},${it.totalCreditPurchases},${it.totalPaid},${it.remaining}")
+            appendLine(csvRow(it.supplier.name, it.totalCreditPurchases, it.totalPaid, it.remaining))
         }
     }
 
     fun paymentsCsv(snapshot: RestaurantSnapshot): String = buildString {
-        appendLine("kind,date,name,amount,method")
+        appendLine(csvRow("kind", "date", "name", "amount", "method"))
         snapshot.projectPayments.forEach { payment ->
             val project = snapshot.projects.firstOrNull { it.id == payment.projectId }?.name.orEmpty()
-            appendLine("project,${PersianDateFormatter.format(payment.date)},$project,${payment.amount},${payment.method.label()}")
+            appendLine(csvRow("project", PersianDateFormatter.format(payment.date), project, payment.amount, payment.method.label()))
         }
         snapshot.supplierPayments.forEach { payment ->
             val supplier = snapshot.suppliers.firstOrNull { it.id == payment.supplierId }?.name.orEmpty()
-            appendLine("supplier,${PersianDateFormatter.format(payment.date)},$supplier,${payment.amount},${payment.method.label()}")
+            appendLine(csvRow("supplier", PersianDateFormatter.format(payment.date), supplier, payment.amount, payment.method.label()))
         }
     }
 
@@ -83,4 +83,13 @@ class ReportsUseCase(
             "مطالبات پروژه‌ها" to MoneyFormatter.format(projectFinanceUseCase.receivableTotal(snapshot)),
             "بدهی تامین‌کنندگان" to MoneyFormatter.format(supplierDebtUseCase.debtTotal(snapshot))
         )
+
+    private fun csvRow(vararg values: Any?): String =
+        values.joinToString(",") { value -> csvCell(value?.toString().orEmpty()) }
+
+    private fun csvCell(value: String): String {
+        val mustQuote = value.any { it == ',' || it == '"' || it == '\n' || it == '\r' }
+        val escaped = value.replace("\"", "\"\"")
+        return if (mustQuote) "\"$escaped\"" else escaped
+    }
 }

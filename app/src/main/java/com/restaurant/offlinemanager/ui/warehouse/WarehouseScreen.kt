@@ -65,6 +65,8 @@ import com.restaurant.offlinemanager.domain.model.InventoryItem
 import com.restaurant.offlinemanager.domain.model.StockTransactionInput
 import com.restaurant.offlinemanager.domain.model.label
 import com.restaurant.offlinemanager.ui.AppUiState
+import java.time.Instant
+import java.time.ZoneId
 
 @Composable
 fun WarehouseMainScreen(
@@ -110,14 +112,14 @@ private fun InventoryTab(
     }
     val lowStock = items.filter { it.isLowStock }
     val today = PersianDateFormatter.todayStartMillis()
-    val todayTransactions = state.snapshot.stockTransactions.filter { it.date == today }
+    val todayTransactions = state.snapshot.stockTransactions.filter { it.date.isSameLocalDay(today) }
     val todayIn = todayTransactions.filter { it.type == StockTransactionType.IN || it.type == StockTransactionType.TRANSFER_IN }.sumOf { it.quantity }
     val todayOut = todayTransactions.filter { it.type == StockTransactionType.OUT || it.type == StockTransactionType.TRANSFER_OUT || it.type == StockTransactionType.WASTE }.sumOf { it.quantity }
 
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { AppSearchBar(query, { query = it }, label = "جستجو در موجودی") }
         item { FilterChipRow(warehouseOptions, selectedWarehouse, { selectedWarehouse = it }) }
-        if (lowStock.isNotEmpty()) {
+        if (state.settings.lowStockNotificationsEnabled && lowStock.isNotEmpty()) {
             item {
                 GlassCard(Modifier.fillMaxWidth(), accent = AppOrange) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -328,7 +330,7 @@ fun StockTransactionFormScreen(
                     MoneyField(unitPrice, { unitPrice = it }, "قیمت واحد", Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(10.dp))
-                DarkOutlinedTextField(PersianDateFormatter.format(PersianDateFormatter.todayStartMillis()), {}, "تاریخ ورود", readOnly = true)
+                DarkOutlinedTextField(PersianDateFormatter.format(PersianDateFormatter.todayStartMillis()), {}, "تاریخ", readOnly = true)
                 Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(notes, { notes = it }, "یادداشت", singleLine = false)
             }
@@ -441,8 +443,6 @@ fun MaterialFormScreen(
         item { SectionHeader("افزودن متریال") }
         item {
             GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
-                OptionSelector("انتخاب انبار", state.snapshot.warehouses, state.snapshot.warehouses.firstOrNull(), { it.name }) {}
-                Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(name, { name = it }, "نام متریال")
                 Spacer(Modifier.height(10.dp))
                 OptionSelector("دسته‌بندی", state.snapshot.materialCategories, category, { it.name }) { category = it }
@@ -461,7 +461,11 @@ fun MaterialFormScreen(
         item {
             GoldPrimaryButton("ثبت متریال", onClick = {
                 val minimum = NumberFormatter.normalizeDigits(minStock).toDoubleOrNull() ?: 0.0
-                error = if (name.isBlank()) "نام متریال الزامی است" else null
+                error = when {
+                    name.isBlank() -> "نام متریال الزامی است"
+                    minimum < 0.0 -> "حداقل موجودی نمی‌تواند منفی باشد"
+                    else -> null
+                }
                 if (error == null) {
                     onSave(
                         MaterialEntity(
@@ -479,4 +483,11 @@ fun MaterialFormScreen(
             }, icon = Icons.Outlined.Save)
         }
     }
+}
+
+private fun Long.isSameLocalDay(dayStartMillis: Long): Boolean {
+    val zone = ZoneId.systemDefault()
+    val thisDay = Instant.ofEpochMilli(this).atZone(zone).toLocalDate()
+    val targetDay = Instant.ofEpochMilli(dayStartMillis).atZone(zone).toLocalDate()
+    return thisDay == targetDay
 }
