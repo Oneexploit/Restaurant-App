@@ -1,6 +1,7 @@
 package com.restaurant.offlinemanager.ui.settings
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,7 +17,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -123,9 +126,30 @@ fun SettingsScreen(
                     AppLogoMark(modifier = Modifier.size(64.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Restaurant Offline Manager", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
-                        Text("مدیریت غذای شرکتی • نسخه ۱.۰.۰", color = TextSecondary)
+                        Text("مدیریت غذای شرکتی • نسخه ۱.۰.۱", color = TextSecondary)
                         Text("کاملا آفلاین، تک‌کاربره، بدون ورود و بدون سرور", color = Gold)
                     }
+                }
+                Spacer(Modifier.height(14.dp))
+                Text("طراحی و توسعه توسط امیرحسین نفر", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                Text("مهندس نرم‌افزار و مهندس امنیت سایبری با بیش از ۸ سال تجربه.", color = TextSecondary)
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    GoldPrimaryButton(
+                        text = "LinkedIn",
+                        onClick = { openExternalUrl(context, "https://www.linkedin.com/in/amirhosein-nafar/") },
+                        icon = Icons.Outlined.Business,
+                        modifier = Modifier.weight(1f)
+                    )
+                    GoldPrimaryButton(
+                        text = "GitHub",
+                        onClick = { openExternalUrl(context, "https://github.com/Oneexploit/") },
+                        icon = Icons.Outlined.Search,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }
@@ -155,6 +179,12 @@ fun SettingsScreen(
             onDismiss = { selectedRestoreUri = null }
         )
     }
+}
+
+private fun openExternalUrl(context: Context, url: String) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(intent) }
 }
 
 @Composable
