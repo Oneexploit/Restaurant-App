@@ -83,7 +83,7 @@ class RestaurantViewModel(
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
+        started = SharingStarted.Eagerly,
         initialValue = AppUiState()
     )
 
@@ -178,6 +178,26 @@ class RestaurantViewModel(
 
     fun deleteMealDelivery(id: Long) = ioAction("وعده حذف شد") {
         repository.deleteMealDelivery(id).getOrThrow()
+    }
+
+    fun deleteWarehouse(id: Long) = ioAction("انبار حذف یا غیرفعال شد") {
+        repository.deleteWarehouse(id).getOrThrow()
+    }
+
+    fun deleteMaterialCategory(id: Long) = ioAction("دسته‌بندی حذف شد") {
+        repository.deleteMaterialCategory(id).getOrThrow()
+    }
+
+    fun deleteMaterial(id: Long) = ioAction("متریال حذف یا غیرفعال شد") {
+        repository.deleteMaterial(id).getOrThrow()
+    }
+
+    fun deleteSupplier(id: Long) = ioAction("تامین‌کننده حذف یا غیرفعال شد") {
+        repository.deleteSupplier(id).getOrThrow()
+    }
+
+    fun deleteBankCard(id: Long) = ioAction("کارت بانکی حذف یا غیرفعال شد") {
+        repository.deleteBankCard(id).getOrThrow()
     }
 
     fun deleteStockTransaction(id: Long) = ioAction("تراکنش انبار حذف شد") {

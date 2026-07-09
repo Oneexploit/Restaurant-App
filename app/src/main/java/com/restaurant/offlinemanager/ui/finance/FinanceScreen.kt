@@ -48,6 +48,7 @@ import com.restaurant.offlinemanager.core.design.AppOrange
 import com.restaurant.offlinemanager.core.design.AppPurple
 import com.restaurant.offlinemanager.core.design.AppRed
 import com.restaurant.offlinemanager.core.design.ConfirmDialog
+import com.restaurant.offlinemanager.core.design.DangerButton
 import com.restaurant.offlinemanager.core.design.DarkOutlinedTextField
 import com.restaurant.offlinemanager.core.design.EmptyState
 import com.restaurant.offlinemanager.core.design.FilterChipRow
@@ -93,6 +94,7 @@ fun FinanceDashboardScreen(
     onEditProjectPayment: (Long) -> Unit,
     onEditSupplierPayment: (Long) -> Unit,
     onEditExpense: (Long) -> Unit,
+    onDeleteBankCard: (Long) -> Unit,
     onDeleteProjectPayment: (Long) -> Unit,
     onDeleteSupplierPayment: (Long) -> Unit,
     onDeleteExpense: (Long) -> Unit,
@@ -102,6 +104,7 @@ fun FinanceDashboardScreen(
     var deleteProjectPaymentId by remember { mutableStateOf<Long?>(null) }
     var deleteSupplierPaymentId by remember { mutableStateOf<Long?>(null) }
     var deleteExpenseId by remember { mutableStateOf<Long?>(null) }
+    var deleteBankCardId by remember { mutableStateOf<Long?>(null) }
     val tabs = listOf("مطالبات پروژه‌ها", "بدهی تامین‌کنندگان", "کارت‌های بانکی", "پرداخت‌ها", "هزینه‌ها")
     LazyColumn(
         modifier = modifier
@@ -183,7 +186,7 @@ fun FinanceDashboardScreen(
                 } else {
                     val maxBalance = state.bankBalances.maxOfOrNull { it.balance.coerceAtLeast(0L) }?.coerceAtLeast(1L) ?: 1L
                     items(state.bankBalances, key = { it.card.id }) { balance ->
-                        BankCardVisual(balance, maxBalance, onEditBankCard)
+                        BankCardVisual(balance, maxBalance, onEditBankCard, onDeleteBankCard = { deleteBankCardId = it })
                     }
                 }
             }
@@ -277,13 +280,26 @@ fun FinanceDashboardScreen(
             onDismiss = { deleteExpenseId = null }
         )
     }
+    deleteBankCardId?.let { id ->
+        ConfirmDialog(
+            title = "حذف کارت بانکی",
+            message = "اگر این کارت در پرداخت، خرید یا هزینه استفاده شده باشد، برای حفظ سوابق فقط غیرفعال می‌شود.",
+            confirmText = "حذف",
+            onConfirm = {
+                deleteBankCardId = null
+                onDeleteBankCard(id)
+            },
+            onDismiss = { deleteBankCardId = null }
+        )
+    }
 }
 
 @Composable
 private fun BankCardVisual(
     balance: BankCardBalance,
     maxBalance: Long,
-    onEditBankCard: (Long) -> Unit
+    onEditBankCard: (Long) -> Unit,
+    onDeleteBankCard: (Long) -> Unit
 ) {
     val accent = if (balance.balance >= 0) AppCyan else AppRed
     GlassCard(Modifier.fillMaxWidth(), accent = accent) {
@@ -339,7 +355,10 @@ private fun BankCardVisual(
             valueLabel = MoneyFormatter.format(balance.balance)
         )
         Spacer(Modifier.height(10.dp))
-        SecondaryGlassButton("ویرایش کارت", onClick = { onEditBankCard(balance.card.id) }, icon = Icons.Outlined.Save, accent = accent)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SecondaryGlassButton("ویرایش کارت", onClick = { onEditBankCard(balance.card.id) }, icon = Icons.Outlined.Save, accent = accent, modifier = Modifier.weight(1f))
+            DangerButton("حذف", onClick = { onDeleteBankCard(balance.card.id) }, modifier = Modifier.weight(1f))
+        }
     }
 }
 
@@ -662,6 +681,7 @@ fun BankCardFormScreen(
     var owner by remember(editing?.id) { mutableStateOf(editing?.ownerName.orEmpty()) }
     var number by remember(editing?.id) { mutableStateOf(editing?.cardNumber.orEmpty()) }
     var balance by remember(editing?.id) { mutableStateOf(editing?.initialBalance?.toString().orEmpty()) }
+    var isActive by remember(editing?.id) { mutableStateOf(editing?.isActive ?: true) }
     var error by remember { mutableStateOf<String?>(null) }
     val now = PersianDateFormatter.nowMillis()
     LazyColumn(
@@ -682,6 +702,12 @@ fun BankCardFormScreen(
                 DarkOutlinedTextField(number, { number = it }, "شماره کارت", keyboardType = KeyboardType.Number)
                 Spacer(Modifier.height(10.dp))
                 MoneyField(balance, { balance = it }, "موجودی اولیه")
+                Spacer(Modifier.height(10.dp))
+                FilterChipRow(
+                    options = listOf("فعال", "غیرفعال"),
+                    selected = if (isActive) "فعال" else "غیرفعال",
+                    onSelected = { isActive = it == "فعال" }
+                )
             }
         }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }
@@ -698,7 +724,7 @@ fun BankCardFormScreen(
                             bankName = bank,
                             cardNumber = number,
                             initialBalance = initial,
-                            isActive = editing?.isActive ?: true,
+                            isActive = isActive,
                             notes = editing?.notes,
                             createdAt = editing?.createdAt ?: now,
                             updatedAt = now

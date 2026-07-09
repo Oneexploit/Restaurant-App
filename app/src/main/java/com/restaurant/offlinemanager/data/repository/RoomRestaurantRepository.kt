@@ -479,6 +479,80 @@ class RoomRestaurantRepository(
             dao.deleteMealDelivery(id)
         }
 
+    override suspend fun deleteWarehouse(id: Long): Result<Unit> =
+        runCatching {
+            val snapshot = currentSnapshot()
+            val warehouse = snapshot.warehouses.firstOrNull { it.id == id }
+                ?: error("انبار پیدا نشد")
+            val isInUse = snapshot.stockTransactions.any { it.warehouseId == id } ||
+                snapshot.purchases.any { it.warehouseId == id }
+            if (isInUse) {
+                dao.insertWarehouse(warehouse.copy(isActive = false, updatedAt = PersianDateFormatter.nowMillis()))
+            } else {
+                dao.deleteWarehouse(id)
+            }
+        }
+
+    override suspend fun deleteMaterialCategory(id: Long): Result<Unit> =
+        runCatching {
+            val snapshot = currentSnapshot()
+            snapshot.materialCategories.firstOrNull { it.id == id }
+                ?: error("دسته‌بندی پیدا نشد")
+            database.withTransaction {
+                snapshot.materials
+                    .filter { it.categoryId == id }
+                    .forEach { material ->
+                        dao.insertMaterial(material.copy(categoryId = null, updatedAt = PersianDateFormatter.nowMillis()))
+                    }
+                dao.deleteMaterialCategory(id)
+            }
+        }
+
+    override suspend fun deleteMaterial(id: Long): Result<Unit> =
+        runCatching {
+            val snapshot = currentSnapshot()
+            val material = snapshot.materials.firstOrNull { it.id == id }
+                ?: error("متریال پیدا نشد")
+            val isInUse = snapshot.stockTransactions.any { it.materialId == id } ||
+                snapshot.purchaseItems.any { it.materialId == id }
+            if (isInUse) {
+                dao.insertMaterial(material.copy(isActive = false, updatedAt = PersianDateFormatter.nowMillis()))
+            } else {
+                dao.deleteMaterial(id)
+            }
+        }
+
+    override suspend fun deleteSupplier(id: Long): Result<Unit> =
+        runCatching {
+            val snapshot = currentSnapshot()
+            val supplier = snapshot.suppliers.firstOrNull { it.id == id }
+                ?: error("تامین‌کننده پیدا نشد")
+            val isInUse = snapshot.purchases.any { it.supplierId == id } ||
+                snapshot.supplierPayments.any { it.supplierId == id } ||
+                snapshot.stockTransactions.any { it.supplierId == id }
+            if (isInUse) {
+                dao.insertSupplier(supplier.copy(isActive = false, updatedAt = PersianDateFormatter.nowMillis()))
+            } else {
+                dao.deleteSupplier(id)
+            }
+        }
+
+    override suspend fun deleteBankCard(id: Long): Result<Unit> =
+        runCatching {
+            val snapshot = currentSnapshot()
+            val card = snapshot.bankCards.firstOrNull { it.id == id }
+                ?: error("کارت بانکی پیدا نشد")
+            val isInUse = snapshot.purchases.any { it.bankCardId == id } ||
+                snapshot.projectPayments.any { it.bankCardId == id } ||
+                snapshot.supplierPayments.any { it.bankCardId == id } ||
+                snapshot.expenses.any { it.bankCardId == id }
+            if (isInUse) {
+                dao.insertBankCard(card.copy(isActive = false, updatedAt = PersianDateFormatter.nowMillis()))
+            } else {
+                dao.deleteBankCard(id)
+            }
+        }
+
     override suspend fun deleteStockTransaction(id: Long): Result<Unit> =
         runCatching {
             val snapshot = currentSnapshot()

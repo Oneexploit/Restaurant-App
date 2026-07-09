@@ -36,6 +36,11 @@ interface RestaurantRepository {
     suspend fun saveSupplierPayment(input: SupplierPaymentInput): Result<Long>
     suspend fun saveExpense(entity: ExpenseEntity): Long
     suspend fun deleteMealDelivery(id: Long): Result<Unit>
+    suspend fun deleteWarehouse(id: Long): Result<Unit>
+    suspend fun deleteMaterialCategory(id: Long): Result<Unit>
+    suspend fun deleteMaterial(id: Long): Result<Unit>
+    suspend fun deleteSupplier(id: Long): Result<Unit>
+    suspend fun deleteBankCard(id: Long): Result<Unit>
     suspend fun deleteStockTransaction(id: Long): Result<Unit>
     suspend fun deletePurchase(id: Long): Result<Unit>
     suspend fun deleteProjectPayment(id: Long): Result<Unit>

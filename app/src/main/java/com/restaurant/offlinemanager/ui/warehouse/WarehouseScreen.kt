@@ -20,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -88,6 +89,9 @@ fun WarehouseMainScreen(
     onEditWarehouse: (Long) -> Unit,
     onEditMaterialCategory: (Long) -> Unit,
     onEditMaterial: (Long) -> Unit,
+    onDeleteWarehouse: (Long) -> Unit,
+    onDeleteMaterialCategory: (Long) -> Unit,
+    onDeleteMaterial: (Long) -> Unit,
     onDeleteStockTransaction: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -102,10 +106,10 @@ fun WarehouseMainScreen(
         Spacer(Modifier.height(12.dp))
         when (tab) {
             0 -> InventoryTab(state, onStockIn, onStockOut, onTransfer, onWaste, onAdjustment)
-            1 -> WarehousesTab(state, onAddWarehouse, onEditWarehouse)
+            1 -> WarehousesTab(state, onAddWarehouse, onEditWarehouse, onDeleteWarehouse)
             2 -> TransactionsTab(state, onDeleteStockTransaction)
-            3 -> MaterialsTab(state, onAddMaterial, onAddMaterialCategory, onEditMaterial)
-            4 -> CategoriesTab(state, onAddMaterialCategory, onEditMaterialCategory)
+            3 -> MaterialsTab(state, onAddMaterial, onAddMaterialCategory, onEditMaterial, onDeleteMaterial)
+            4 -> CategoriesTab(state, onAddMaterialCategory, onEditMaterialCategory, onDeleteMaterialCategory)
         }
     }
 }
@@ -255,7 +259,13 @@ private fun ReorderSuggestionCard(items: List<InventoryItem>, onStockIn: () -> U
 }
 
 @Composable
-private fun WarehousesTab(state: AppUiState, onAddWarehouse: () -> Unit, onEditWarehouse: (Long) -> Unit) {
+private fun WarehousesTab(
+    state: AppUiState,
+    onAddWarehouse: () -> Unit,
+    onEditWarehouse: (Long) -> Unit,
+    onDeleteWarehouse: (Long) -> Unit
+) {
+    var deleteId by remember { mutableStateOf<Long?>(null) }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { GoldPrimaryButton("افزودن انبار", onClick = onAddWarehouse, icon = Icons.Outlined.Add) }
         if (state.snapshot.warehouses.isEmpty()) {
@@ -277,10 +287,25 @@ private fun WarehousesTab(state: AppUiState, onAddWarehouse: () -> Unit, onEditW
                         }
                     }
                     Spacer(Modifier.height(8.dp))
-                    SecondaryGlassButton("ویرایش", onClick = { onEditWarehouse(warehouse.id) }, icon = Icons.Outlined.Save, accent = AppCyan)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SecondaryGlassButton("ویرایش", onClick = { onEditWarehouse(warehouse.id) }, icon = Icons.Outlined.Save, accent = AppCyan, modifier = Modifier.weight(1f))
+                        DangerButton("حذف", onClick = { deleteId = warehouse.id }, modifier = Modifier.weight(1f))
+                    }
                 }
             }
         }
+    }
+    deleteId?.let { id ->
+        ConfirmDialog(
+            title = "حذف انبار",
+            message = "اگر این انبار در فاکتور یا تراکنش استفاده شده باشد، برای حفظ سوابق فقط غیرفعال می‌شود.",
+            confirmText = "حذف",
+            onConfirm = {
+                deleteId = null
+                onDeleteWarehouse(id)
+            },
+            onDismiss = { deleteId = null }
+        )
     }
 }
 
@@ -332,7 +357,14 @@ private fun TransactionsTab(state: AppUiState, onDeleteStockTransaction: (Long) 
 }
 
 @Composable
-private fun MaterialsTab(state: AppUiState, onAddMaterial: () -> Unit, onAddCategory: () -> Unit, onEditMaterial: (Long) -> Unit) {
+private fun MaterialsTab(
+    state: AppUiState,
+    onAddMaterial: () -> Unit,
+    onAddCategory: () -> Unit,
+    onEditMaterial: (Long) -> Unit,
+    onDeleteMaterial: (Long) -> Unit
+) {
+    var deleteId by remember { mutableStateOf<Long?>(null) }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -357,10 +389,25 @@ private fun MaterialsTab(state: AppUiState, onAddMaterial: () -> Unit, onAddCate
                         StatusChip(if (material.isActive) "فعال" else "غیرفعال", if (material.isActive) AppGreen else TextMuted)
                     }
                     Spacer(Modifier.height(8.dp))
-                    SecondaryGlassButton("ویرایش", onClick = { onEditMaterial(material.id) }, icon = Icons.Outlined.Save, accent = AppCyan)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SecondaryGlassButton("ویرایش", onClick = { onEditMaterial(material.id) }, icon = Icons.Outlined.Save, accent = AppCyan, modifier = Modifier.weight(1f))
+                        DangerButton("حذف", onClick = { deleteId = material.id }, modifier = Modifier.weight(1f))
+                    }
                 }
             }
         }
+    }
+    deleteId?.let { id ->
+        ConfirmDialog(
+            title = "حذف متریال",
+            message = "اگر این متریال در خرید یا انبار استفاده شده باشد، برای حفظ سوابق فقط غیرفعال می‌شود.",
+            confirmText = "حذف",
+            onConfirm = {
+                deleteId = null
+                onDeleteMaterial(id)
+            },
+            onDismiss = { deleteId = null }
+        )
     }
 }
 
@@ -386,6 +433,21 @@ fun StockTransactionFormScreen(
         ?.quantity ?: 0.0
     val isOutbound = mode == StockTransactionType.OUT || mode == StockTransactionType.TRANSFER_OUT || mode == StockTransactionType.WASTE
     val setupReady = warehouses.isNotEmpty() && materials.isNotEmpty()
+
+    LaunchedEffect(warehouses) {
+        if (fromWarehouse == null || warehouses.none { it.id == fromWarehouse?.id }) {
+            fromWarehouse = warehouses.firstOrNull()
+        }
+        if (toWarehouse == null || warehouses.none { it.id == toWarehouse?.id }) {
+            toWarehouse = warehouses.drop(1).firstOrNull() ?: warehouses.firstOrNull()
+        }
+    }
+
+    LaunchedEffect(materials) {
+        if (material == null || materials.none { it.id == material?.id }) {
+            material = materials.firstOrNull()
+        }
+    }
 
     LazyColumn(
         modifier = modifier
@@ -494,6 +556,7 @@ fun WarehouseFormScreen(
     var type by remember(editing?.id) { mutableStateOf(editing?.type ?: WarehouseType.GENERAL) }
     var address by remember(editing?.id) { mutableStateOf(editing?.address.orEmpty()) }
     var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
+    var isActive by remember(editing?.id) { mutableStateOf(editing?.isActive ?: true) }
     var error by remember { mutableStateOf<String?>(null) }
     val now = PersianDateFormatter.nowMillis()
     LazyColumn(
@@ -512,6 +575,12 @@ fun WarehouseFormScreen(
                 DarkOutlinedTextField(address, { address = it }, "آدرس", singleLine = false)
                 Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false)
+                Spacer(Modifier.height(10.dp))
+                FilterChipRow(
+                    options = listOf("فعال", "غیرفعال"),
+                    selected = if (isActive) "فعال" else "غیرفعال",
+                    onSelected = { isActive = it == "فعال" }
+                )
             }
         }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }
@@ -526,7 +595,7 @@ fun WarehouseFormScreen(
                             type = type,
                             address = address,
                             notes = notes,
-                            isActive = editing?.isActive ?: true,
+                            isActive = isActive,
                             createdAt = editing?.createdAt ?: now,
                             updatedAt = now
                         )
@@ -551,6 +620,7 @@ fun MaterialFormScreen(
     var minStock by remember(editing?.id) { mutableStateOf(editing?.minimumStock?.toString().orEmpty()) }
     var emoji by remember(editing?.id) { mutableStateOf(editing?.imageEmoji ?: "🍽") }
     var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
+    var isActive by remember(editing?.id) { mutableStateOf(editing?.isActive ?: true) }
     var category by remember(editing?.id, state.snapshot.materialCategories) {
         mutableStateOf(
             state.snapshot.materialCategories.firstOrNull { it.id == editing?.categoryId }
@@ -583,6 +653,12 @@ fun MaterialFormScreen(
                 Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false)
                 Spacer(Modifier.height(10.dp))
+                FilterChipRow(
+                    options = listOf("فعال", "غیرفعال"),
+                    selected = if (isActive) "فعال" else "غیرفعال",
+                    onSelected = { isActive = it == "فعال" }
+                )
+                Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(PersianDateFormatter.format(PersianDateFormatter.todayStartMillis()), {}, "تاریخ ثبت", readOnly = true)
             }
         }
@@ -606,7 +682,7 @@ fun MaterialFormScreen(
                             minimumStock = minimum,
                             imageEmoji = emoji,
                             notes = notes,
-                            isActive = editing?.isActive ?: true,
+                            isActive = isActive,
                             createdAt = editing?.createdAt ?: now,
                             updatedAt = now
                         )
@@ -618,7 +694,13 @@ fun MaterialFormScreen(
 }
 
 @Composable
-private fun CategoriesTab(state: AppUiState, onAddCategory: () -> Unit, onEditCategory: (Long) -> Unit) {
+private fun CategoriesTab(
+    state: AppUiState,
+    onAddCategory: () -> Unit,
+    onEditCategory: (Long) -> Unit,
+    onDeleteCategory: (Long) -> Unit
+) {
+    var deleteId by remember { mutableStateOf<Long?>(null) }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { GoldPrimaryButton("افزودن دسته‌بندی", onClick = onAddCategory, icon = Icons.Outlined.Add) }
         if (state.snapshot.materialCategories.isEmpty()) {
@@ -635,10 +717,25 @@ private fun CategoriesTab(state: AppUiState, onAddCategory: () -> Unit, onEditCa
                         }
                     }
                     Spacer(Modifier.height(8.dp))
-                    SecondaryGlassButton("ویرایش", onClick = { onEditCategory(category.id) }, icon = Icons.Outlined.Save, accent = AppCyan)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SecondaryGlassButton("ویرایش", onClick = { onEditCategory(category.id) }, icon = Icons.Outlined.Save, accent = AppCyan, modifier = Modifier.weight(1f))
+                        DangerButton("حذف", onClick = { deleteId = category.id }, modifier = Modifier.weight(1f))
+                    }
                 }
             }
         }
+    }
+    deleteId?.let { id ->
+        ConfirmDialog(
+            title = "حذف دسته‌بندی",
+            message = "متریال‌های داخل این دسته‌بندی حذف نمی‌شوند و فقط بدون دسته‌بندی می‌مانند.",
+            confirmText = "حذف",
+            onConfirm = {
+                deleteId = null
+                onDeleteCategory(id)
+            },
+            onDismiss = { deleteId = null }
+        )
     }
 }
 

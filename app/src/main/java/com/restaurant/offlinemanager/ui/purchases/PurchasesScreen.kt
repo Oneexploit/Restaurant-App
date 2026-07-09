@@ -76,12 +76,14 @@ fun PurchasesListScreen(
     onEditPurchase: (Long) -> Unit,
     onAddSupplier: () -> Unit,
     onEditSupplier: (Long) -> Unit,
+    onDeleteSupplier: (Long) -> Unit,
     onDeletePurchase: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("همه") }
     var deleteId by remember { mutableStateOf<Long?>(null) }
+    var deleteSupplierId by remember { mutableStateOf<Long?>(null) }
     val purchases = state.snapshot.purchases.filter { purchase ->
         val supplier = state.snapshot.suppliers.firstOrNull { it.id == purchase.supplierId }?.name.orEmpty()
         val queryMatch = query.isBlank() || supplier.contains(query) || purchase.invoiceNumber.orEmpty().contains(query)
@@ -127,7 +129,10 @@ fun PurchasesListScreen(
                         StatusChip(if (supplier.isActive) "فعال" else "غیرفعال", if (supplier.isActive) AppGreen else TextMuted)
                     }
                     Spacer(Modifier.height(8.dp))
-                    SecondaryGlassButton("ویرایش", onClick = { onEditSupplier(supplier.id) }, icon = Icons.Outlined.Save, accent = AppCyan)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SecondaryGlassButton("ویرایش", onClick = { onEditSupplier(supplier.id) }, icon = Icons.Outlined.Save, accent = AppCyan, modifier = Modifier.weight(1f))
+                        DangerButton("حذف", onClick = { deleteSupplierId = supplier.id }, modifier = Modifier.weight(1f))
+                    }
                 }
             }
         }
@@ -173,6 +178,18 @@ fun PurchasesListScreen(
                 onDeletePurchase(id)
             },
             onDismiss = { deleteId = null }
+        )
+    }
+    deleteSupplierId?.let { id ->
+        ConfirmDialog(
+            title = "حذف تامین‌کننده",
+            message = "اگر این تامین‌کننده در خرید یا پرداخت استفاده شده باشد، برای حفظ سوابق فقط غیرفعال می‌شود.",
+            confirmText = "حذف",
+            onConfirm = {
+                deleteSupplierId = null
+                onDeleteSupplier(id)
+            },
+            onDismiss = { deleteSupplierId = null }
         )
     }
 }
@@ -390,6 +407,7 @@ fun SupplierFormScreen(
     var phone by remember(editing?.id) { mutableStateOf(editing?.phone.orEmpty()) }
     var address by remember(editing?.id) { mutableStateOf(editing?.address.orEmpty()) }
     var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
+    var isActive by remember(editing?.id) { mutableStateOf(editing?.isActive ?: true) }
     var error by remember { mutableStateOf<String?>(null) }
     val now = PersianDateFormatter.nowMillis()
 
@@ -409,6 +427,12 @@ fun SupplierFormScreen(
                 DarkOutlinedTextField(address, { address = it }, "آدرس", singleLine = false)
                 Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false)
+                Spacer(Modifier.height(10.dp))
+                FilterChipRow(
+                    options = listOf("فعال", "غیرفعال"),
+                    selected = if (isActive) "فعال" else "غیرفعال",
+                    onSelected = { isActive = it == "فعال" }
+                )
             }
         }
         if (error != null) item { Text(error.orEmpty(), color = AppRed) }
@@ -425,7 +449,7 @@ fun SupplierFormScreen(
                                 phone = phone,
                                 address = address,
                                 notes = notes,
-                                isActive = editing?.isActive ?: true,
+                                isActive = isActive,
                                 createdAt = editing?.createdAt ?: now,
                                 updatedAt = now
                             )

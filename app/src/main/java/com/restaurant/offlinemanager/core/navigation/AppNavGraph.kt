@@ -182,6 +182,9 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                     onEditWarehouse = { navController.navigate("${Routes.AddEditWarehouse}/$it") },
                     onEditMaterialCategory = { navController.navigate("${Routes.AddMaterialCategory}/$it") },
                     onEditMaterial = { navController.navigate("${Routes.AddEditMaterial}/$it") },
+                    onDeleteWarehouse = viewModel::deleteWarehouse,
+                    onDeleteMaterialCategory = viewModel::deleteMaterialCategory,
+                    onDeleteMaterial = viewModel::deleteMaterial,
                     onDeleteStockTransaction = viewModel::deleteStockTransaction
                 )
             }
@@ -249,6 +252,7 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                     onEditPurchase = { navController.navigate("${Routes.AddEditPurchase}/$it") },
                     onAddSupplier = { navController.navigate("${Routes.AddSupplier}/0") },
                     onEditSupplier = { navController.navigate("${Routes.AddSupplier}/$it") },
+                    onDeleteSupplier = viewModel::deleteSupplier,
                     onDeletePurchase = viewModel::deletePurchase
                 )
             }
@@ -286,6 +290,7 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                     onEditProjectPayment = { navController.navigate("${Routes.AddProjectPayment}/0/$it") },
                     onEditSupplierPayment = { navController.navigate("${Routes.AddSupplierPayment}/$it") },
                     onEditExpense = { navController.navigate("${Routes.AddExpense}/$it") },
+                    onDeleteBankCard = viewModel::deleteBankCard,
                     onDeleteProjectPayment = viewModel::deleteProjectPayment,
                     onDeleteSupplierPayment = viewModel::deleteSupplierPayment,
                     onDeleteExpense = viewModel::deleteExpense

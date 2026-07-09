@@ -232,6 +232,21 @@ interface RestaurantDao {
     @Query("DELETE FROM expenses")
     suspend fun clearExpenses()
 
+    @Query("DELETE FROM warehouses WHERE id = :id")
+    suspend fun deleteWarehouse(id: Long)
+
+    @Query("DELETE FROM material_categories WHERE id = :id")
+    suspend fun deleteMaterialCategory(id: Long)
+
+    @Query("DELETE FROM materials WHERE id = :id")
+    suspend fun deleteMaterial(id: Long)
+
+    @Query("DELETE FROM suppliers WHERE id = :id")
+    suspend fun deleteSupplier(id: Long)
+
+    @Query("DELETE FROM bank_cards WHERE id = :id")
+    suspend fun deleteBankCard(id: Long)
+
     @Query("DELETE FROM meal_deliveries WHERE id = :id")
     suspend fun deleteMealDelivery(id: Long)
 
