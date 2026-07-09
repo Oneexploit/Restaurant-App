@@ -106,6 +106,7 @@ data class ProjectInput(
 )
 
 data class MealDeliveryInput(
+    val id: Long = 0,
     val projectId: Long,
     val date: Long,
     val mealType: com.restaurant.offlinemanager.data.local.entity.MealType,
@@ -138,6 +139,7 @@ data class PurchaseItemInput(
 }
 
 data class PurchaseInput(
+    val id: Long = 0,
     val supplierId: Long?,
     val warehouseId: Long,
     val date: Long,
@@ -150,6 +152,7 @@ data class PurchaseInput(
 )
 
 data class ProjectPaymentInput(
+    val id: Long = 0,
     val projectId: Long,
     val bankCardId: Long?,
     val amount: Long,
@@ -159,6 +162,7 @@ data class ProjectPaymentInput(
 )
 
 data class SupplierPaymentInput(
+    val id: Long = 0,
     val supplierId: Long,
     val bankCardId: Long?,
     val amount: Long,

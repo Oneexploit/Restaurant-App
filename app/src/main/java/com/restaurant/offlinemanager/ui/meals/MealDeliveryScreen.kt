@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material3.MaterialTheme
@@ -58,6 +59,7 @@ import com.restaurant.offlinemanager.ui.AppUiState
 fun MealDeliveryListScreen(
     state: AppUiState,
     onAddMeal: () -> Unit,
+    onEditMeal: (Long) -> Unit,
     onDeleteMeal: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -88,7 +90,10 @@ fun MealDeliveryListScreen(
                         }
                     }
                     Spacer(Modifier.height(8.dp))
-                    DangerButton("حذف وعده", onClick = { deleteId = delivery.id })
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        GoldPrimaryButton("ویرایش", onClick = { onEditMeal(delivery.id) }, icon = Icons.Outlined.Edit, modifier = Modifier.weight(1f))
+                        DangerButton("حذف وعده", onClick = { deleteId = delivery.id }, modifier = Modifier.weight(1f))
+                    }
                 }
             }
         }
@@ -108,14 +113,23 @@ fun MealDeliveryListScreen(
     }
 }
 
+private fun String?.toMealTypeOrDefault(): MealType =
+    when (this) {
+        MealType.BREAKFAST.label() -> MealType.BREAKFAST
+        MealType.DINNER.label() -> MealType.DINNER
+        else -> MealType.LUNCH
+    }
+
 @Composable
 fun MealDeliveryFormScreen(
     state: AppUiState,
     preselectedProjectId: Long?,
+    deliveryId: Long?,
     onSave: (MealDeliveryInput) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val projects = state.snapshot.projects.filter { it.status != ProjectStatus.ARCHIVED }
+    val editing = state.snapshot.mealDeliveries.firstOrNull { it.id == deliveryId }
+    val projects = state.snapshot.projects.filter { it.status == ProjectStatus.ACTIVE || it.id == editing?.projectId }
     val setupReady = projects.isNotEmpty()
     var projectQuery by remember { mutableStateOf("") }
     val filteredProjects = projects.filter {
@@ -123,18 +137,29 @@ fun MealDeliveryFormScreen(
             it.name.contains(projectQuery) ||
             it.companyName.orEmpty().contains(projectQuery)
     }
-    var selectedProject by remember { mutableStateOf<ProjectEntity?>(projects.firstOrNull { it.id == preselectedProjectId } ?: projects.firstOrNull()) }
-    var mealType by remember { mutableStateOf(MealType.LUNCH) }
-    var quantity by remember { mutableStateOf(selectedProject?.workerCount?.toString().orEmpty()) }
-    var unitPrice by remember { mutableStateOf(selectedProject?.mealPrice?.toString().orEmpty()) }
-    var date by remember { mutableStateOf(PersianDateFormatter.todayStartMillis()) }
-    var notes by remember { mutableStateOf("") }
+    var selectedProject by remember(editing?.id, projects) {
+        mutableStateOf<ProjectEntity?>(
+            projects.firstOrNull { it.id == editing?.projectId }
+                ?: projects.firstOrNull { it.id == preselectedProjectId }
+                ?: projects.firstOrNull()
+        )
+    }
+    var mealType by remember(editing?.id) { mutableStateOf(editing?.mealType ?: selectedProject?.defaultMealType.toMealTypeOrDefault()) }
+    var quantity by remember(editing?.id) { mutableStateOf(editing?.quantity?.toString() ?: selectedProject?.workerCount?.toString().orEmpty()) }
+    var unitPrice by remember(editing?.id) { mutableStateOf(editing?.unitPrice?.toString() ?: selectedProject?.mealPrice?.toString().orEmpty()) }
+    var date by remember(editing?.id) { mutableStateOf(editing?.date ?: PersianDateFormatter.todayStartMillis()) }
+    var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(selectedProject?.id) {
         selectedProject?.let {
-            if (quantity.isBlank()) quantity = it.workerCount.toString()
-            unitPrice = it.mealPrice.toString()
+            if (editing == null) {
+                mealType = it.defaultMealType.toMealTypeOrDefault()
+                quantity = it.workerCount.toString()
+                unitPrice = it.mealPrice.toString()
+            } else if (quantity.isBlank()) {
+                quantity = it.workerCount.toString()
+            }
         }
     }
 
@@ -222,6 +247,7 @@ fun MealDeliveryFormScreen(
                     if (error == null && project != null) {
                         onSave(
                             MealDeliveryInput(
+                                id = editing?.id ?: 0,
                                 projectId = project.id,
                                 date = date,
                                 mealType = mealType,

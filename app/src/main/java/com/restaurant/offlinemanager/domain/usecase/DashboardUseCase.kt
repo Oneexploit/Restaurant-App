@@ -23,8 +23,7 @@ class DashboardUseCase(
 
     fun calculate(snapshot: RestaurantSnapshot): DashboardStats {
         val today = LocalDate.now()
-        val month = today.monthValue
-        val year = today.year
+        val currentMonthKey = PersianDateFormatter.currentMonthKey()
         val inventory = inventoryUseCase.calculateInventory(snapshot)
         return DashboardStats(
             activeProjectsCount = snapshot.projects.count { it.status == ProjectStatus.ACTIVE },
@@ -35,19 +34,14 @@ class DashboardUseCase(
             lowStockItemCount = inventory.count { it.isLowStock },
             totalInventoryValue = inventory.sumOf { it.approximateValue },
             bankCardsTotalBalance = bankCardBalanceUseCase.totalBalance(snapshot),
-            monthPurchasesTotal = snapshot.purchases.filter { isSameMonth(it.date, year, month) }.sumOf { it.totalAmount },
-            monthReceivedTotal = snapshot.projectPayments.filter { isSameMonth(it.date, year, month) }.sumOf { it.amount },
-            monthExpensesTotal = snapshot.expenses.filter { isSameMonth(it.date, year, month) }.sumOf { it.amount }
+            monthPurchasesTotal = snapshot.purchases.filter { PersianDateFormatter.monthKey(it.date) == currentMonthKey }.sumOf { it.totalAmount },
+            monthReceivedTotal = snapshot.projectPayments.filter { PersianDateFormatter.monthKey(it.date) == currentMonthKey }.sumOf { it.amount },
+            monthExpensesTotal = snapshot.expenses.filter { PersianDateFormatter.monthKey(it.date) == currentMonthKey }.sumOf { it.amount }
         )
     }
 
     private fun isSameDay(timestamp: Long, day: LocalDate): Boolean =
         Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).toLocalDate() == day
-
-    private fun isSameMonth(timestamp: Long, year: Int, month: Int): Boolean {
-        val date = Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
-        return date.year == year && date.monthValue == month
-    }
 
     fun todayLabel(): String = PersianDateFormatter.formatLong(PersianDateFormatter.nowMillis())
 }

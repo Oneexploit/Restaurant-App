@@ -145,6 +145,7 @@ fun ReportsScreen(
         item { GoldPrimaryButton("خروجی مطالبات", onClick = { onExport(context, CsvReportType.RECEIVABLES) }, icon = Icons.Outlined.FileDownload) }
         item { GoldPrimaryButton("خروجی بدهی تامین‌کنندگان", onClick = { onExport(context, CsvReportType.SUPPLIER_DEBTS) }, icon = Icons.Outlined.FileDownload) }
         item { GoldPrimaryButton("خروجی پرداخت‌ها", onClick = { onExport(context, CsvReportType.PAYMENTS) }, icon = Icons.Outlined.FileDownload) }
+        item { GoldPrimaryButton("خروجی هزینه‌ها", onClick = { onExport(context, CsvReportType.EXPENSES) }, icon = Icons.Outlined.FileDownload) }
         item { Spacer(Modifier.height(20.dp)) }
     }
 }

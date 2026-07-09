@@ -35,15 +35,16 @@ Run unit tests:
 ## Features
 
 - Dark premium dashboard with glass cards and gold accents.
-- Seed data on first launch for projects, warehouses, materials, suppliers, cards, purchases, stock, deliveries, payments, and expenses.
+- Starts with an empty local database so operators create their own warehouses, categories, materials, suppliers, cards, and projects.
 - Project receivable calculation from Room data.
 - Supplier debt calculation from credit purchases and supplier payments.
 - Inventory calculation from stock transactions.
 - Bank card balance calculation from initial balance, received project payments, card purchases, supplier payments, and expenses.
 - Multi-item daily purchase invoices with automatic stock-in transactions.
+- Edit support for meal deliveries, purchase invoices, project receipts, supplier payments, and expenses.
 - Stock in, stock out, transfer, waste, and adjustment forms.
 - Local CSV export for purchases, inventory, receivables, supplier debts, and payments.
-- Local JSON backup and restore for all Room tables.
+- Local JSON backup and guarded restore for all Room tables, including structure validation and an automatic pre-restore backup.
 - DataStore setting for local low-stock warning visibility.
 
 ## Database Overview

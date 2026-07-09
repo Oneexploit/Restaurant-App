@@ -57,7 +57,8 @@ enum class CsvReportType(val filePrefix: String, val successLabel: String) {
     INVENTORY("inventory", "گزارش موجودی"),
     RECEIVABLES("project-receivables", "گزارش مطالبات"),
     SUPPLIER_DEBTS("supplier-debts", "گزارش بدهی تامین‌کنندگان"),
-    PAYMENTS("payments", "گزارش پرداخت‌ها")
+    PAYMENTS("payments", "گزارش پرداخت‌ها"),
+    EXPENSES("expenses", "گزارش هزینه‌ها")
 }
 
 class RestaurantViewModel(
@@ -168,6 +169,7 @@ class RestaurantViewModel(
             CsvReportType.RECEIVABLES -> useCases.reports.receivablesCsv(snapshot)
             CsvReportType.SUPPLIER_DEBTS -> useCases.reports.supplierDebtsCsv(snapshot)
             CsvReportType.PAYMENTS -> useCases.reports.paymentsCsv(snapshot)
+            CsvReportType.EXPENSES -> useCases.reports.expensesCsv(snapshot)
         }
         val file = repository.exportCsv(context, "${type.filePrefix}-${System.currentTimeMillis()}.csv", csv)
         _messages.tryEmit("فایل CSV: ${file.absolutePath}")

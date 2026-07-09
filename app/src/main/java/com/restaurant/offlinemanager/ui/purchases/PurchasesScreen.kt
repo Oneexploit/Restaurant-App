@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Payments
@@ -72,6 +73,7 @@ import com.restaurant.offlinemanager.ui.AppUiState
 fun PurchasesListScreen(
     state: AppUiState,
     onAddPurchase: () -> Unit,
+    onEditPurchase: (Long) -> Unit,
     onAddSupplier: () -> Unit,
     onEditSupplier: (Long) -> Unit,
     onDeletePurchase: (Long) -> Unit,
@@ -152,7 +154,10 @@ fun PurchasesListScreen(
                         }
                     }
                     Spacer(Modifier.height(8.dp))
-                    DangerButton("حذف فاکتور", onClick = { deleteId = purchase.id })
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SecondaryGlassButton("ویرایش", onClick = { onEditPurchase(purchase.id) }, icon = Icons.Outlined.Edit, accent = AppCyan, modifier = Modifier.weight(1f))
+                        DangerButton("حذف فاکتور", onClick = { deleteId = purchase.id }, modifier = Modifier.weight(1f))
+                    }
                 }
             }
         }
@@ -175,23 +180,41 @@ fun PurchasesListScreen(
 @Composable
 fun PurchaseFormScreen(
     state: AppUiState,
+    purchaseId: Long?,
     onSave: (PurchaseInput) -> Unit,
     onAddSupplier: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val editing = state.snapshot.purchases.firstOrNull { it.id == purchaseId }
+    val editingItems = state.snapshot.purchaseItems.filter { it.purchaseId == editing?.id }
     val suppliers = state.snapshot.suppliers.filter { it.isActive }
     val warehouses = state.snapshot.warehouses.filter { it.isActive }
     val cards = state.snapshot.bankCards.filter { it.isActive }
-    var supplier by remember { mutableStateOf(suppliers.firstOrNull()) }
-    var warehouse by remember { mutableStateOf(warehouses.firstOrNull()) }
-    var paymentType by remember { mutableStateOf(PurchasePaymentType.CASH) }
-    var card by remember { mutableStateOf(cards.firstOrNull()) }
-    var invoice by remember { mutableStateOf("") }
-    var discount by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf(PersianDateFormatter.todayStartMillis()) }
-    var notes by remember { mutableStateOf("") }
+    var supplier by remember(editing?.id, suppliers) { mutableStateOf(suppliers.firstOrNull { it.id == editing?.supplierId } ?: suppliers.firstOrNull()) }
+    var warehouse by remember(editing?.id, warehouses) { mutableStateOf(warehouses.firstOrNull { it.id == editing?.warehouseId } ?: warehouses.firstOrNull()) }
+    var paymentType by remember(editing?.id) { mutableStateOf(editing?.paymentType ?: PurchasePaymentType.CASH) }
+    var card by remember(editing?.id, cards) { mutableStateOf(cards.firstOrNull { it.id == editing?.bankCardId } ?: cards.firstOrNull()) }
+    var invoice by remember(editing?.id) { mutableStateOf(editing?.invoiceNumber.orEmpty()) }
+    var discount by remember(editing?.id) { mutableStateOf(editing?.discountAmount?.toString().orEmpty()) }
+    var date by remember(editing?.id) { mutableStateOf(editing?.date ?: PersianDateFormatter.todayStartMillis()) }
+    var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
-    val rows = remember { mutableStateListOf(PurchaseRow()) }
+    val rows = remember(editing?.id) {
+        mutableStateListOf<PurchaseRow>().apply {
+            if (editingItems.isEmpty()) {
+                add(PurchaseRow())
+            } else {
+                addAll(editingItems.map { item ->
+                    PurchaseRow(
+                        localId = item.id,
+                        materialId = item.materialId,
+                        quantity = item.quantity.toString(),
+                        unitPrice = item.unitPrice.toString()
+                    )
+                })
+            }
+        }
+    }
 
     val activeMaterials = state.snapshot.materials.filter { it.isActive }
     val setupReady = warehouses.isNotEmpty() && activeMaterials.isNotEmpty()
@@ -217,7 +240,7 @@ fun PurchaseFormScreen(
             .padding(horizontal = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { SectionHeader("ثبت فاکتور خرید") }
+        item { SectionHeader(if (editing == null) "ثبت فاکتور خرید" else "ویرایش فاکتور خرید") }
         if (!setupReady) {
             item {
                 EmptyState(
@@ -297,6 +320,7 @@ fun PurchaseFormScreen(
                     if (error == null && wh != null) {
                         onSave(
                             PurchaseInput(
+                                id = editing?.id ?: 0,
                                 supplierId = supplier?.id,
                                 warehouseId = wh.id,
                                 date = date,

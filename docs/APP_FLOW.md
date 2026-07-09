@@ -29,6 +29,8 @@ Create or edit a project, then register meal deliveries and payments. Project re
 
 Select a project, choose meal type, enter quantity and unit price. The form calculates total live and saves a Room delivery row.
 
+Meal delivery rows can be edited later. The app blocks duplicate delivery rows for the same project, date, and meal type.
+
 ### Warehouse
 
 Inventory is calculated from stock transactions. Users can register stock in, stock out, transfer between warehouses, waste, and adjustment.
@@ -44,6 +46,8 @@ Daily purchases support multiple invoice items. Saving a purchase:
 3. Inserts the purchase.
 4. Inserts purchase items.
 5. Creates stock `IN` transactions for each item.
+
+Editing a purchase replaces its purchase items and regenerates the automatic stock `IN` transactions in one Room transaction.
 
 ### Finance
 
@@ -68,4 +72,4 @@ Reports use the same Room snapshot and use cases as the dashboard. CSV files are
 
 Backup exports all Room tables to a JSON file in the app external files `backups` directory.
 
-Restore reads a selected JSON document, clears current tables in a Room transaction, and reinserts preserved IDs where possible.
+Restore validates the selected JSON document, creates an automatic pre-restore backup of current data, clears current tables in a Room transaction, and reinserts preserved IDs where possible.

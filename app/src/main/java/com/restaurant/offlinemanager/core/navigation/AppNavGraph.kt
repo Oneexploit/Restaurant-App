@@ -102,11 +102,11 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                 HomeScreen(
                     state = state,
                     onAddProject = { navController.navigate("${Routes.AddEditProject}/0") },
-                    onAddMeal = { navController.navigate("${Routes.AddEditMealDelivery}/0") },
+                    onAddMeal = { navController.navigate("${Routes.AddEditMealDelivery}/0/0") },
                     onStockIn = { navController.navigate(Routes.AddStockIn) },
                     onStockOut = { navController.navigate(Routes.AddStockOut) },
-                    onAddPurchase = { navController.navigate(Routes.AddEditPurchase) },
-                    onAddPayment = { navController.navigate("${Routes.AddProjectPayment}/0") },
+                    onAddPurchase = { navController.navigate("${Routes.AddEditPurchase}/0") },
+                    onAddPayment = { navController.navigate("${Routes.AddProjectPayment}/0/0") },
                     onReports = { navController.navigate(Routes.Reports) },
                     onAddWarehouse = { navController.navigate("${Routes.AddEditWarehouse}/0") },
                     onAddMaterialCategory = { navController.navigate("${Routes.AddMaterialCategory}/0") },
@@ -120,8 +120,8 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                     state = state,
                     onAddProject = { navController.navigate("${Routes.AddEditProject}/0") },
                     onProjectDetails = { navController.navigate("${Routes.ProjectDetails}/$it") },
-                    onAddMeal = { navController.navigate("${Routes.AddEditMealDelivery}/$it") },
-                    onAddPayment = { navController.navigate("${Routes.AddProjectPayment}/$it") }
+                    onAddMeal = { navController.navigate("${Routes.AddEditMealDelivery}/$it/0") },
+                    onAddPayment = { navController.navigate("${Routes.AddProjectPayment}/$it/0") }
                 )
             }
             composable(
@@ -133,8 +133,8 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                     state = state,
                     projectId = projectId,
                     onEdit = { navController.navigate("${Routes.AddEditProject}/$it") },
-                    onAddMeal = { navController.navigate("${Routes.AddEditMealDelivery}/$it") },
-                    onAddPayment = { navController.navigate("${Routes.AddProjectPayment}/$it") },
+                    onAddMeal = { navController.navigate("${Routes.AddEditMealDelivery}/$it/0") },
+                    onAddPayment = { navController.navigate("${Routes.AddProjectPayment}/$it/0") },
                     onArchive = { viewModel.archiveProject(it) }
                 )
             }
@@ -150,16 +150,21 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
             composable(Routes.MealDeliveryList) {
                 MealDeliveryListScreen(
                     state,
-                    onAddMeal = { navController.navigate("${Routes.AddEditMealDelivery}/0") },
+                    onAddMeal = { navController.navigate("${Routes.AddEditMealDelivery}/0/0") },
+                    onEditMeal = { navController.navigate("${Routes.AddEditMealDelivery}/0/$it") },
                     onDeleteMeal = viewModel::deleteMealDelivery
                 )
             }
             composable(
-                route = "${Routes.AddEditMealDelivery}/{projectId}",
-                arguments = listOf(navArgument("projectId") { type = NavType.LongType })
+                route = "${Routes.AddEditMealDelivery}/{projectId}/{deliveryId}",
+                arguments = listOf(
+                    navArgument("projectId") { type = NavType.LongType },
+                    navArgument("deliveryId") { type = NavType.LongType }
+                )
             ) { entry ->
                 val projectId = entry.arguments?.getLong("projectId")?.takeIf { it != 0L }
-                MealDeliveryFormScreen(state, projectId, onSave = {
+                val deliveryId = entry.arguments?.getLong("deliveryId")?.takeIf { it != 0L }
+                MealDeliveryFormScreen(state, projectId, deliveryId, onSave = {
                     viewModel.saveMealDelivery(it) { navController.popBackStack() }
                 })
             }
@@ -240,15 +245,21 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
             composable(Routes.PurchasesList) {
                 PurchasesListScreen(
                     state,
-                    onAddPurchase = { navController.navigate(Routes.AddEditPurchase) },
+                    onAddPurchase = { navController.navigate("${Routes.AddEditPurchase}/0") },
+                    onEditPurchase = { navController.navigate("${Routes.AddEditPurchase}/$it") },
                     onAddSupplier = { navController.navigate("${Routes.AddSupplier}/0") },
                     onEditSupplier = { navController.navigate("${Routes.AddSupplier}/$it") },
                     onDeletePurchase = viewModel::deletePurchase
                 )
             }
-            composable(Routes.AddEditPurchase) {
+            composable(
+                route = "${Routes.AddEditPurchase}/{purchaseId}",
+                arguments = listOf(navArgument("purchaseId") { type = NavType.LongType })
+            ) { entry ->
+                val purchaseId = entry.arguments?.getLong("purchaseId")?.takeIf { it != 0L }
                 PurchaseFormScreen(
                     state,
+                    purchaseId,
                     onSave = {
                         viewModel.savePurchase(it) { navController.popBackStack() }
                     },
@@ -267,27 +278,38 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
             composable(Routes.FinanceDashboard) {
                 FinanceDashboardScreen(
                     state = state,
-                    onAddProjectPayment = { navController.navigate("${Routes.AddProjectPayment}/0") },
-                    onAddSupplierPayment = { navController.navigate(Routes.AddSupplierPayment) },
+                    onAddProjectPayment = { navController.navigate("${Routes.AddProjectPayment}/0/0") },
+                    onAddSupplierPayment = { navController.navigate("${Routes.AddSupplierPayment}/0") },
                     onAddBankCard = { navController.navigate("${Routes.AddEditBankCard}/0") },
                     onEditBankCard = { navController.navigate("${Routes.AddEditBankCard}/$it") },
-                    onAddExpense = { navController.navigate(Routes.AddExpense) },
+                    onAddExpense = { navController.navigate("${Routes.AddExpense}/0") },
+                    onEditProjectPayment = { navController.navigate("${Routes.AddProjectPayment}/0/$it") },
+                    onEditSupplierPayment = { navController.navigate("${Routes.AddSupplierPayment}/$it") },
+                    onEditExpense = { navController.navigate("${Routes.AddExpense}/$it") },
                     onDeleteProjectPayment = viewModel::deleteProjectPayment,
                     onDeleteSupplierPayment = viewModel::deleteSupplierPayment,
                     onDeleteExpense = viewModel::deleteExpense
                 )
             }
             composable(
-                route = "${Routes.AddProjectPayment}/{projectId}",
-                arguments = listOf(navArgument("projectId") { type = NavType.LongType })
+                route = "${Routes.AddProjectPayment}/{projectId}/{paymentId}",
+                arguments = listOf(
+                    navArgument("projectId") { type = NavType.LongType },
+                    navArgument("paymentId") { type = NavType.LongType }
+                )
             ) { entry ->
                 val projectId = entry.arguments?.getLong("projectId")?.takeIf { it != 0L }
-                ProjectPaymentFormScreen(state, projectId, onSave = {
+                val paymentId = entry.arguments?.getLong("paymentId")?.takeIf { it != 0L }
+                ProjectPaymentFormScreen(state, projectId, paymentId, onSave = {
                     viewModel.saveProjectPayment(it) { navController.popBackStack() }
                 })
             }
-            composable(Routes.AddSupplierPayment) {
-                SupplierPaymentFormScreen(state, onSave = {
+            composable(
+                route = "${Routes.AddSupplierPayment}/{paymentId}",
+                arguments = listOf(navArgument("paymentId") { type = NavType.LongType })
+            ) { entry ->
+                val paymentId = entry.arguments?.getLong("paymentId")?.takeIf { it != 0L }
+                SupplierPaymentFormScreen(state, paymentId, onSave = {
                     viewModel.saveSupplierPayment(it) { navController.popBackStack() }
                 })
             }
@@ -300,8 +322,12 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                     viewModel.saveBankCard(it) { navController.popBackStack() }
                 })
             }
-            composable(Routes.AddExpense) {
-                ExpenseFormScreen(state, onSave = {
+            composable(
+                route = "${Routes.AddExpense}/{expenseId}",
+                arguments = listOf(navArgument("expenseId") { type = NavType.LongType })
+            ) { entry ->
+                val expenseId = entry.arguments?.getLong("expenseId")?.takeIf { it != 0L }
+                ExpenseFormScreen(state, expenseId, onSave = {
                     viewModel.saveExpense(it) { navController.popBackStack() }
                 })
             }
@@ -313,10 +339,15 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                     state,
                     onResultClick = { result ->
                         when {
-                            result.id.startsWith("project-payment-") || result.id.startsWith("card-") -> navController.navigate(Routes.FinanceDashboard)
+                            result.id.startsWith("meal-") -> navController.navigate("${Routes.AddEditMealDelivery}/0/${result.rawId}")
+                            result.id.startsWith("project-payment-") -> navController.navigate("${Routes.AddProjectPayment}/0/${result.rawId}")
+                            result.id.startsWith("supplier-payment-") -> navController.navigate("${Routes.AddSupplierPayment}/${result.rawId}")
+                            result.id.startsWith("expense-") -> navController.navigate("${Routes.AddExpense}/${result.rawId}")
+                            result.id.startsWith("card-") -> navController.navigate("${Routes.AddEditBankCard}/${result.rawId}")
                             result.id.startsWith("project-") -> navController.navigate("${Routes.ProjectDetails}/${result.rawId}")
-                            result.id.startsWith("material-") || result.id.startsWith("warehouse-") -> navController.navigate(Routes.WarehousesList)
-                            result.id.startsWith("supplier-") || result.id.startsWith("purchase-") -> navController.navigate(Routes.PurchasesList)
+                            result.id.startsWith("material-") || result.id.startsWith("warehouse-") || result.id.startsWith("stock-") -> navController.navigate(Routes.WarehousesList)
+                            result.id.startsWith("supplier-") -> navController.navigate("${Routes.AddSupplier}/${result.rawId}")
+                            result.id.startsWith("purchase-") -> navController.navigate("${Routes.AddEditPurchase}/${result.rawId}")
                         }
                     }
                 )

@@ -51,8 +51,9 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     var confirmRestore by remember { mutableStateOf(false) }
+    var selectedRestoreUri by remember { mutableStateOf<Uri?>(null) }
     val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) onRestoreBackup(context, uri)
+        if (uri != null) selectedRestoreUri = uri
     }
 
     LazyColumn(
@@ -140,6 +141,18 @@ fun SettingsScreen(
                 restoreLauncher.launch(arrayOf("application/json", "text/*"))
             },
             onDismiss = { confirmRestore = false }
+        )
+    }
+    selectedRestoreUri?.let { uri ->
+        ConfirmDialog(
+            title = "تایید فایل پشتیبان",
+            message = "فایل انتخاب‌شده: ${uri.lastPathSegment.orEmpty()}\nقبل از بازیابی، یک پشتیبان خودکار از اطلاعات فعلی ساخته می‌شود.",
+            confirmText = "بازیابی",
+            onConfirm = {
+                selectedRestoreUri = null
+                onRestoreBackup(context, uri)
+            },
+            onDismiss = { selectedRestoreUri = null }
         )
     }
 }

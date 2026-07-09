@@ -35,6 +35,7 @@ import com.restaurant.offlinemanager.domain.repository.RestaurantRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -117,6 +118,62 @@ class UseCaseCalculationTest {
         val result = useCase.calculateBalances(snapshot).single()
 
         assertEquals(980, result.balance)
+    }
+
+    @Test
+    fun dashboardUsesCurrentJalaliMonthForMonthlyTotals() {
+        val today = com.restaurant.offlinemanager.core.utils.PersianDateFormatter.todayStartMillis()
+        val older = com.restaurant.offlinemanager.core.utils.PersianDateFormatter.shiftDays(today, -45)
+        val snapshot = RestaurantSnapshot(
+            purchases = listOf(
+                purchase(supplierId = 1, total = 1_000, paymentType = PurchasePaymentType.CASH).copy(date = today),
+                purchase(supplierId = 1, total = 9_000, paymentType = PurchasePaymentType.CASH).copy(id = 9_000, date = older)
+            ),
+            projectPayments = listOf(
+                projectPayment(projectId = 1, amount = 700).copy(date = today),
+                projectPayment(projectId = 1, amount = 4_000).copy(id = 4_000, date = older)
+            ),
+            expenses = listOf(
+                expense(amount = 300, cardId = 1).copy(date = today),
+                expense(amount = 2_000, cardId = 1).copy(id = 2_000, date = older)
+            )
+        )
+        val repository = FakeRepository(snapshot)
+        val dashboard = DashboardUseCase(
+            repository,
+            ProjectFinanceUseCase(repository),
+            SupplierDebtUseCase(repository),
+            InventoryUseCase(repository),
+            BankCardBalanceUseCase(repository)
+        )
+
+        val result = dashboard.calculate(snapshot)
+
+        assertEquals(1_000, result.monthPurchasesTotal)
+        assertEquals(700, result.monthReceivedTotal)
+        assertEquals(300, result.monthExpensesTotal)
+    }
+
+    @Test
+    fun reportsExportExpensesCsv() {
+        val card = bankCard(initial = 0)
+        val snapshot = RestaurantSnapshot(
+            bankCards = listOf(card),
+            expenses = listOf(expense(amount = 120, cardId = card.id).copy(title = "Fuel"))
+        )
+        val repository = FakeRepository(snapshot)
+        val reports = ReportsUseCase(
+            repository,
+            ProjectFinanceUseCase(repository),
+            SupplierDebtUseCase(repository),
+            InventoryUseCase(repository)
+        )
+
+        val csv = reports.expensesCsv(snapshot)
+
+        assertTrue(csv.contains("date,title,category,amount,bank_card,notes"))
+        assertTrue(csv.contains("Fuel"))
+        assertTrue(csv.contains("120"))
     }
 
     private fun project(id: Long = 1): ProjectEntity =

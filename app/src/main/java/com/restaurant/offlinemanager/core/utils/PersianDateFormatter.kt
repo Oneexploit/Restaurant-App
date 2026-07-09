@@ -61,6 +61,8 @@ object PersianDateFormatter {
         return "${jalali.year}-${jalali.month.toString().padStart(2, '0')}"
     }
 
+    fun currentMonthKey(): String = monthKey(nowMillis())
+
     private fun gregorianToJalali(gy: Int, gm: Int, gd: Int): JalaliDate {
         val gDaysInMonth = intArrayOf(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
         val jDaysInMonth = intArrayOf(31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29)

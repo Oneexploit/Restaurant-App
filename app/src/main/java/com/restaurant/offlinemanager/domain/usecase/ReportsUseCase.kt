@@ -77,6 +77,14 @@ class ReportsUseCase(
         }
     }
 
+    fun expensesCsv(snapshot: RestaurantSnapshot): String = buildString {
+        appendLine(csvRow("date", "title", "category", "amount", "bank_card", "notes"))
+        snapshot.expenses.forEach { expense ->
+            val card = snapshot.bankCards.firstOrNull { it.id == expense.bankCardId }?.title.orEmpty()
+            appendLine(csvRow(PersianDateFormatter.format(expense.date), expense.title, expense.category.label(), expense.amount, card, expense.notes.orEmpty()))
+        }
+    }
+
     fun humanSummary(snapshot: RestaurantSnapshot): List<Pair<String, String>> =
         listOf(
             "ارزش انبار" to MoneyFormatter.format(inventoryUseCase.calculateInventory(snapshot).sumOf { it.approximateValue }),

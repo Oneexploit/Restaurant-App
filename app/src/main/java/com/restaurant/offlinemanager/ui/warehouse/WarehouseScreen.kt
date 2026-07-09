@@ -450,6 +450,7 @@ fun StockTransactionFormScreen(
                         mode == StockTransactionType.TRANSFER_OUT && toWarehouse == null -> "انبار مقصد را انتخاب کنید"
                         mode == StockTransactionType.TRANSFER_OUT && toWarehouse?.id == fromWarehouse?.id -> "انبار مبدا و مقصد نمی‌تواند یکسان باشد"
                         isOutbound && qty > availableStock -> "موجودی کافی نیست"
+                        mode == StockTransactionType.ADJUSTMENT && availableStock + qty < 0.0 -> "اصلاح موجودی نمی‌تواند موجودی نهایی را منفی کند"
                         else -> null
                     }
                     val wh = fromWarehouse

@@ -30,7 +30,9 @@ import com.restaurant.offlinemanager.core.design.StatusChip
 import com.restaurant.offlinemanager.core.design.TextPrimary
 import com.restaurant.offlinemanager.core.design.TextSecondary
 import com.restaurant.offlinemanager.core.utils.MoneyFormatter
+import com.restaurant.offlinemanager.core.utils.NumberFormatter
 import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
+import com.restaurant.offlinemanager.domain.model.label
 import com.restaurant.offlinemanager.domain.model.maskCardNumber
 import com.restaurant.offlinemanager.ui.AppUiState
 
@@ -51,27 +53,73 @@ fun SearchScreen(
     var query by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf("همه") }
     val results = remember(query, state.snapshot) {
-        if (query.isBlank()) emptyList() else buildList {
-            state.snapshot.projects.filter { it.name.contains(query) || it.companyName.orEmpty().contains(query) }.forEach {
+        val cleanQuery = query.trim()
+        val normalizedQuery = NumberFormatter.normalizeDigits(cleanQuery)
+        fun String.matchesSearch(): Boolean =
+            contains(cleanQuery, ignoreCase = true) || NumberFormatter.normalizeDigits(this).contains(normalizedQuery, ignoreCase = true)
+        fun Long.matchesSearch(): Boolean = toString().contains(normalizedQuery)
+        fun Double.matchesSearch(): Boolean = toString().contains(normalizedQuery)
+
+        if (cleanQuery.isBlank()) emptyList() else buildList {
+            state.snapshot.projects.filter { it.name.matchesSearch() || it.companyName.orEmpty().matchesSearch() }.forEach {
                 add(SearchResultUi("project-${it.id}", it.id, it.name, it.companyName.orEmpty(), "پروژه"))
             }
-            state.snapshot.materials.filter { it.name.contains(query) }.forEach {
+            state.snapshot.materials.filter { it.name.matchesSearch() || it.notes.orEmpty().matchesSearch() }.forEach {
                 add(SearchResultUi("material-${it.id}", it.id, it.name, it.notes.orEmpty(), "متریال"))
             }
-            state.snapshot.suppliers.filter { it.name.contains(query) || it.phone.orEmpty().contains(query) }.forEach {
+            state.snapshot.suppliers.filter { it.name.matchesSearch() || it.phone.orEmpty().matchesSearch() }.forEach {
                 add(SearchResultUi("supplier-${it.id}", it.id, it.name, it.phone.orEmpty(), "تامین‌کننده"))
             }
-            state.snapshot.warehouses.filter { it.name.contains(query) }.forEach {
+            state.snapshot.warehouses.filter { it.name.matchesSearch() || it.address.orEmpty().matchesSearch() }.forEach {
                 add(SearchResultUi("warehouse-${it.id}", it.id, it.name, it.address.orEmpty(), "انبار"))
             }
-            state.snapshot.purchases.filter { it.invoiceNumber.orEmpty().contains(query) }.forEach {
-                add(SearchResultUi("purchase-${it.id}", it.id, "فاکتور ${it.invoiceNumber}", MoneyFormatter.format(it.totalAmount), "خرید"))
+            state.snapshot.mealDeliveries.filter { delivery ->
+                val project = state.snapshot.projects.firstOrNull { it.id == delivery.projectId }
+                project?.name.orEmpty().matchesSearch() ||
+                    delivery.mealType.label().matchesSearch() ||
+                    PersianDateFormatter.format(delivery.date).matchesSearch() ||
+                    delivery.totalAmount.matchesSearch()
+            }.forEach {
+                val project = state.snapshot.projects.firstOrNull { p -> p.id == it.projectId }?.name.orEmpty()
+                add(SearchResultUi("meal-${it.id}", it.id, project, "${it.mealType.label()} • ${MoneyFormatter.format(it.totalAmount)}", "وعده"))
             }
-            state.snapshot.projectPayments.filter { it.amount.toString().contains(query) }.forEach {
+            state.snapshot.stockTransactions.filter { tx ->
+                val material = state.snapshot.materials.firstOrNull { it.id == tx.materialId }
+                val warehouse = state.snapshot.warehouses.firstOrNull { it.id == tx.warehouseId }
+                material?.name.orEmpty().matchesSearch() ||
+                    warehouse?.name.orEmpty().matchesSearch() ||
+                    tx.type.label().matchesSearch() ||
+                    tx.quantity.matchesSearch()
+            }.forEach {
+                val material = state.snapshot.materials.firstOrNull { m -> m.id == it.materialId }?.name.orEmpty()
+                add(SearchResultUi("stock-${it.id}", it.id, material, "${it.type.label()} • ${NumberFormatter.format(it.quantity)}", "تراکنش انبار"))
+            }
+            state.snapshot.purchases.filter { purchase ->
+                val supplier = state.snapshot.suppliers.firstOrNull { it.id == purchase.supplierId }?.name.orEmpty()
+                purchase.invoiceNumber.orEmpty().matchesSearch() || supplier.matchesSearch() || purchase.totalAmount.matchesSearch()
+            }.forEach {
+                add(SearchResultUi("purchase-${it.id}", it.id, "فاکتور ${it.invoiceNumber.orEmpty()}".trim(), MoneyFormatter.format(it.totalAmount), "خرید"))
+            }
+            state.snapshot.projectPayments.filter {
+                val project = state.snapshot.projects.firstOrNull { p -> p.id == it.projectId }?.name.orEmpty()
+                project.matchesSearch() || it.amount.matchesSearch()
+            }.forEach {
                 val project = state.snapshot.projects.firstOrNull { p -> p.id == it.projectId }?.name.orEmpty()
                 add(SearchResultUi("project-payment-${it.id}", it.id, project, "${MoneyFormatter.format(it.amount)} • ${PersianDateFormatter.format(it.date)}", "دریافت"))
             }
-            state.snapshot.bankCards.filter { it.title.contains(query) || it.cardNumber.orEmpty().contains(query) }.forEach {
+            state.snapshot.supplierPayments.filter {
+                val supplier = state.snapshot.suppliers.firstOrNull { s -> s.id == it.supplierId }?.name.orEmpty()
+                supplier.matchesSearch() || it.amount.matchesSearch()
+            }.forEach {
+                val supplier = state.snapshot.suppliers.firstOrNull { s -> s.id == it.supplierId }?.name.orEmpty()
+                add(SearchResultUi("supplier-payment-${it.id}", it.id, supplier, "${MoneyFormatter.format(it.amount)} • ${PersianDateFormatter.format(it.date)}", "پرداخت تامین‌کننده"))
+            }
+            state.snapshot.expenses.filter {
+                it.title.matchesSearch() || it.category.label().matchesSearch() || it.amount.matchesSearch()
+            }.forEach {
+                add(SearchResultUi("expense-${it.id}", it.id, it.title, "${it.category.label()} • ${MoneyFormatter.format(it.amount)}", "هزینه"))
+            }
+            state.snapshot.bankCards.filter { it.title.matchesSearch() || it.cardNumber.orEmpty().matchesSearch() }.forEach {
                 add(SearchResultUi("card-${it.id}", it.id, it.title, maskCardNumber(it.cardNumber), "کارت بانکی"))
             }
         }
