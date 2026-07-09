@@ -35,6 +35,7 @@ import com.restaurant.offlinemanager.domain.repository.RestaurantRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -174,6 +175,63 @@ class UseCaseCalculationTest {
         assertTrue(csv.contains("date,title,category,amount,bank_card,notes"))
         assertTrue(csv.contains("Fuel"))
         assertTrue(csv.contains("120"))
+    }
+
+    @Test
+    fun inventoryIntegrityRejectsPurchaseEditThatWouldMakeStockNegative() {
+        val warehouse = warehouse()
+        val material = material()
+        val originalPurchaseIn = stock(warehouse.id, material.id, StockTransactionType.IN, 10.0)
+            .copy(id = 1, purchaseId = 1, reason = StockReason.PURCHASE)
+        val consumed = stock(warehouse.id, material.id, StockTransactionType.OUT, 8.0)
+            .copy(id = 2)
+        val reducedPurchaseIn = originalPurchaseIn.copy(id = 3, quantity = 5.0)
+        val snapshot = RestaurantSnapshot(
+            warehouses = listOf(warehouse),
+            materials = listOf(material),
+            stockTransactions = listOf(originalPurchaseIn, consumed)
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            InventoryIntegrityValidator.validateNonNegative(snapshot, listOf(consumed, reducedPurchaseIn))
+        }
+    }
+
+    @Test
+    fun inventoryIntegrityAllowsPurchaseEditWhenStockStaysPositive() {
+        val warehouse = warehouse()
+        val material = material()
+        val originalPurchaseIn = stock(warehouse.id, material.id, StockTransactionType.IN, 10.0)
+            .copy(id = 1, purchaseId = 1, reason = StockReason.PURCHASE)
+        val consumed = stock(warehouse.id, material.id, StockTransactionType.OUT, 3.0)
+            .copy(id = 2)
+        val reducedPurchaseIn = originalPurchaseIn.copy(id = 3, quantity = 5.0)
+        val snapshot = RestaurantSnapshot(
+            warehouses = listOf(warehouse),
+            materials = listOf(material),
+            stockTransactions = listOf(originalPurchaseIn, consumed)
+        )
+
+        InventoryIntegrityValidator.validateNonNegative(snapshot, listOf(consumed, reducedPurchaseIn))
+    }
+
+    @Test
+    fun inventoryIntegrityRejectsDeletingManualInTransactionWhenConsumed() {
+        val warehouse = warehouse()
+        val material = material()
+        val manualIn = stock(warehouse.id, material.id, StockTransactionType.IN, 5.0)
+            .copy(id = 1)
+        val consumed = stock(warehouse.id, material.id, StockTransactionType.OUT, 5.0)
+            .copy(id = 2)
+        val snapshot = RestaurantSnapshot(
+            warehouses = listOf(warehouse),
+            materials = listOf(material),
+            stockTransactions = listOf(manualIn, consumed)
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            InventoryIntegrityValidator.validateNonNegative(snapshot, listOf(consumed))
+        }
     }
 
     private fun project(id: Long = 1): ProjectEntity =

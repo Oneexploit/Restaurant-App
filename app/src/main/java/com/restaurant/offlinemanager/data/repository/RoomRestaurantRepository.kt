@@ -38,6 +38,7 @@ import com.restaurant.offlinemanager.domain.model.RestaurantSnapshot
 import com.restaurant.offlinemanager.domain.model.StockTransactionInput
 import com.restaurant.offlinemanager.domain.model.SupplierPaymentInput
 import com.restaurant.offlinemanager.domain.repository.RestaurantRepository
+import com.restaurant.offlinemanager.domain.usecase.InventoryIntegrityValidator
 import com.restaurant.offlinemanager.domain.usecase.InventoryUseCase
 import com.restaurant.offlinemanager.domain.usecase.ProjectFinanceUseCase
 import com.restaurant.offlinemanager.domain.usecase.SupplierDebtUseCase
@@ -303,7 +304,7 @@ class RoomRestaurantRepository(
                 "شماره فاکتور برای این تامین‌کننده قبلا ثبت شده است"
             }
             if (input.id != 0L) {
-                validateNonNegativeInventory(
+                InventoryIntegrityValidator.validateNonNegative(
                     snapshot = snapshot,
                     transactions = stockTransactionsReplacingPurchase(snapshot, input.id, input.warehouseId, input.items)
                 )
@@ -485,7 +486,7 @@ class RoomRestaurantRepository(
                 ?: dao.getStockTransaction(id)
                 ?: error("تراکنش انبار پیدا نشد")
             require(tx.purchaseId == null) { "تراکنش‌های خودکار خرید را از خود فاکتور خرید اصلاح یا حذف کنید" }
-            validateNonNegativeInventory(
+            InventoryIntegrityValidator.validateNonNegative(
                 snapshot = snapshot,
                 transactions = snapshot.stockTransactions.filterNot { it.id == id }
             )
@@ -496,7 +497,7 @@ class RoomRestaurantRepository(
         runCatching {
             dao.getPurchase(id) ?: error("فاکتور خرید پیدا نشد")
             val snapshot = currentSnapshot()
-            validateNonNegativeInventory(
+            InventoryIntegrityValidator.validateNonNegative(
                 snapshot = snapshot,
                 transactions = snapshot.stockTransactions.filterNot { it.purchaseId == id }
             )
@@ -609,30 +610,6 @@ private fun stockTransactionsReplacingPurchase(
     }
     return snapshot.stockTransactions.filterNot { it.purchaseId == purchaseId } + replacementTransactions
 }
-
-private fun validateNonNegativeInventory(
-    snapshot: RestaurantSnapshot,
-    transactions: List<StockTransactionEntity>
-) {
-    val balances = mutableMapOf<Pair<Long, Long>, Double>()
-    transactions.forEach { tx ->
-        val key = tx.warehouseId to tx.materialId
-        balances[key] = (balances[key] ?: 0.0) + tx.signedQuantity()
-    }
-    val offender = balances.entries.firstOrNull { it.value < -0.000001 } ?: return
-    val warehouse = snapshot.warehouses.firstOrNull { it.id == offender.key.first }?.name ?: "انبار"
-    val material = snapshot.materials.firstOrNull { it.id == offender.key.second }?.name ?: "کالا"
-    require(false) {
-        "این تغییر موجودی $material در $warehouse را منفی می‌کند"
-    }
-}
-
-private fun StockTransactionEntity.signedQuantity(): Double =
-    when (type) {
-        StockTransactionType.IN, StockTransactionType.TRANSFER_IN -> quantity
-        StockTransactionType.OUT, StockTransactionType.TRANSFER_OUT, StockTransactionType.WASTE -> -quantity
-        StockTransactionType.ADJUSTMENT -> quantity
-    }
 
 private object BackupJson {
     fun encode(snapshot: RestaurantSnapshot): String {
@@ -951,7 +928,7 @@ private object BackupJson {
         }) {
             "فایل پشتیبان مقدار تراکنش انبار نامعتبر دارد"
         }
-        validateNonNegativeInventory(snapshot, snapshot.stockTransactions)
+        InventoryIntegrityValidator.validateNonNegative(snapshot, snapshot.stockTransactions)
         require(snapshot.projectPayments.all {
             it.projectId in projectIds && (it.bankCardId == null || it.bankCardId in bankCardIds) && it.amount > 0
         }) {

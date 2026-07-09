@@ -1,6 +1,5 @@
 package com.restaurant.offlinemanager.domain.usecase
 
-import com.restaurant.offlinemanager.data.local.entity.StockTransactionType
 import com.restaurant.offlinemanager.domain.model.InventoryItem
 import com.restaurant.offlinemanager.domain.model.RestaurantSnapshot
 import com.restaurant.offlinemanager.domain.repository.RestaurantRepository
@@ -21,13 +20,7 @@ class InventoryUseCase(private val repository: RestaurantRepository) {
         snapshot.warehouses.filter { it.isActive }.forEach { warehouse ->
             snapshot.materials.filter { it.isActive }.forEach { material ->
                 val transactions = grouped[warehouse.id to material.id].orEmpty()
-                val quantity = transactions.sumOf { tx ->
-                    when (tx.type) {
-                        StockTransactionType.IN, StockTransactionType.TRANSFER_IN -> tx.quantity
-                        StockTransactionType.OUT, StockTransactionType.TRANSFER_OUT, StockTransactionType.WASTE -> -tx.quantity
-                        StockTransactionType.ADJUSTMENT -> tx.quantity
-                    }
-                }
+                val quantity = transactions.sumOf(InventoryIntegrityValidator::signedQuantity)
                 if (transactions.isNotEmpty()) {
                     val unitPrice = latestPrices[material.id] ?: 0L
                     inventory += InventoryItem(
