@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -240,7 +241,7 @@ fun ProjectFormScreen(
     var mealPrice by remember(editing?.id) { mutableStateOf(editing?.mealPrice?.toString().orEmpty()) }
     var defaultMeal by remember(editing?.id) { mutableStateOf(editing?.defaultMealType ?: "ناهار") }
     var status by remember(editing?.id) { mutableStateOf(editing?.status ?: ProjectStatus.ACTIVE) }
-    var startDate by remember(editing?.id) { mutableStateOf(editing?.startDate ?: PersianDateFormatter.todayStartMillis()) }
+    var startDate by remember(editing?.id) { mutableLongStateOf(editing?.startDate ?: PersianDateFormatter.todayStartMillis()) }
     var endDate by remember(editing?.id) { mutableStateOf(editing?.endDate) }
     var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }

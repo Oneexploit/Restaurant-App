@@ -31,6 +31,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -489,7 +490,7 @@ fun ProjectPaymentFormScreen(
     var card by remember(editing?.id, cards) { mutableStateOf<BankCardEntity?>(cards.firstOrNull { it.id == editing?.bankCardId } ?: cards.firstOrNull()) }
     var amount by remember(editing?.id) { mutableStateOf(editing?.amount?.toString().orEmpty()) }
     var method by remember(editing?.id) { mutableStateOf(editing?.method ?: PaymentMethod.BANK_TRANSFER) }
-    var date by remember(editing?.id) { mutableStateOf(editing?.date ?: PersianDateFormatter.todayStartMillis()) }
+    var date by remember(editing?.id) { mutableLongStateOf(editing?.date ?: PersianDateFormatter.todayStartMillis()) }
     var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
     val remaining = state.projectFinances
@@ -556,7 +557,7 @@ fun SupplierPaymentFormScreen(
     var card by remember(editing?.id, cards) { mutableStateOf<BankCardEntity?>(cards.firstOrNull { it.id == editing?.bankCardId } ?: cards.firstOrNull()) }
     var amount by remember(editing?.id) { mutableStateOf(editing?.amount?.toString().orEmpty()) }
     var method by remember(editing?.id) { mutableStateOf(editing?.method ?: PaymentMethod.CARD_TO_CARD) }
-    var date by remember(editing?.id) { mutableStateOf(editing?.date ?: PersianDateFormatter.todayStartMillis()) }
+    var date by remember(editing?.id) { mutableLongStateOf(editing?.date ?: PersianDateFormatter.todayStartMillis()) }
     var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
     val remaining = state.supplierDebts
@@ -623,10 +624,10 @@ private fun <T> PaymentFormLayout(
     notes: String,
     onNotes: (String) -> Unit,
     error: String?,
-    balanceLabel: String? = null,
-    balanceAmount: Long? = null,
     onSave: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    balanceLabel: String? = null,
+    balanceAmount: Long? = null
 ) {
     LazyColumn(
         modifier = modifier
@@ -749,7 +750,7 @@ fun ExpenseFormScreen(
     var category by remember(editing?.id) { mutableStateOf(editing?.category ?: ExpenseCategory.OTHER) }
     var amount by remember(editing?.id) { mutableStateOf(editing?.amount?.toString().orEmpty()) }
     var card by remember(editing?.id, cards) { mutableStateOf<BankCardEntity?>(cards.firstOrNull { it.id == editing?.bankCardId }) }
-    var date by remember(editing?.id) { mutableStateOf(editing?.date ?: PersianDateFormatter.todayStartMillis()) }
+    var date by remember(editing?.id) { mutableLongStateOf(editing?.date ?: PersianDateFormatter.todayStartMillis()) }
     var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
     val now = PersianDateFormatter.nowMillis()
@@ -768,7 +769,14 @@ fun ExpenseFormScreen(
                 Spacer(Modifier.height(10.dp))
                 MoneyField(amount, { amount = it }, "مبلغ")
                 Spacer(Modifier.height(10.dp))
-                OptionSelector("کارت بانکی (اختیاری)", cards, card, { it.title }) { card = it }
+                OptionSelector(
+                    "کارت بانکی (اختیاری)",
+                    cards,
+                    card,
+                    { it.title },
+                    clearLabel = "بدون کارت",
+                    onClear = { card = null }
+                ) { card = it }
                 Spacer(Modifier.height(10.dp))
                 LocalDateSelector("تاریخ", date, { date = it })
                 Spacer(Modifier.height(10.dp))

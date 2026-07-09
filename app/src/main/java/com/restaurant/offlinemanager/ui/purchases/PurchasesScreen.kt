@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -204,16 +205,16 @@ fun PurchaseFormScreen(
 ) {
     val editing = state.snapshot.purchases.firstOrNull { it.id == purchaseId }
     val editingItems = state.snapshot.purchaseItems.filter { it.purchaseId == editing?.id }
-    val suppliers = state.snapshot.suppliers.filter { it.isActive }
-    val warehouses = state.snapshot.warehouses.filter { it.isActive }
-    val cards = state.snapshot.bankCards.filter { it.isActive }
-    var supplier by remember(editing?.id, suppliers) { mutableStateOf(suppliers.firstOrNull { it.id == editing?.supplierId } ?: suppliers.firstOrNull()) }
+    val suppliers = state.snapshot.suppliers.filter { it.isActive || it.id == editing?.supplierId }
+    val warehouses = state.snapshot.warehouses.filter { it.isActive || it.id == editing?.warehouseId }
+    val cards = state.snapshot.bankCards.filter { it.isActive || it.id == editing?.bankCardId }
+    var supplier by remember(editing?.id, suppliers) { mutableStateOf(suppliers.firstOrNull { it.id == editing?.supplierId }) }
     var warehouse by remember(editing?.id, warehouses) { mutableStateOf(warehouses.firstOrNull { it.id == editing?.warehouseId } ?: warehouses.firstOrNull()) }
     var paymentType by remember(editing?.id) { mutableStateOf(editing?.paymentType ?: PurchasePaymentType.CASH) }
     var card by remember(editing?.id, cards) { mutableStateOf(cards.firstOrNull { it.id == editing?.bankCardId } ?: cards.firstOrNull()) }
     var invoice by remember(editing?.id) { mutableStateOf(editing?.invoiceNumber.orEmpty()) }
     var discount by remember(editing?.id) { mutableStateOf(editing?.discountAmount?.toString().orEmpty()) }
-    var date by remember(editing?.id) { mutableStateOf(editing?.date ?: PersianDateFormatter.todayStartMillis()) }
+    var date by remember(editing?.id) { mutableLongStateOf(editing?.date ?: PersianDateFormatter.todayStartMillis()) }
     var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
     val rows = remember(editing?.id) {
@@ -233,7 +234,8 @@ fun PurchaseFormScreen(
         }
     }
 
-    val activeMaterials = state.snapshot.materials.filter { it.isActive }
+    val editingMaterialIds = editingItems.map { it.materialId }.toSet()
+    val activeMaterials = state.snapshot.materials.filter { it.isActive || it.id in editingMaterialIds }
     val setupReady = warehouses.isNotEmpty() && activeMaterials.isNotEmpty()
     val inputs = rows.mapNotNull { row ->
         val material = activeMaterials.firstOrNull { it.id == row.materialId }
@@ -268,7 +270,14 @@ fun PurchaseFormScreen(
         }
         item {
             GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
-                OptionSelector("تامین‌کننده", suppliers, supplier, { it.name }) { supplier = it }
+                OptionSelector(
+                    "تامین‌کننده",
+                    suppliers,
+                    supplier,
+                    { it.name },
+                    clearLabel = "بدون تامین‌کننده",
+                    onClear = { supplier = null }
+                ) { supplier = it }
                 Spacer(Modifier.height(10.dp))
                 GoldPrimaryButton("افزودن تامین‌کننده", onClick = onAddSupplier, icon = Icons.Outlined.Add)
                 Spacer(Modifier.height(10.dp))

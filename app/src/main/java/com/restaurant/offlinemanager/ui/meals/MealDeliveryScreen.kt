@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -147,7 +148,7 @@ fun MealDeliveryFormScreen(
     var mealType by remember(editing?.id) { mutableStateOf(editing?.mealType ?: selectedProject?.defaultMealType.toMealTypeOrDefault()) }
     var quantity by remember(editing?.id) { mutableStateOf(editing?.quantity?.toString() ?: selectedProject?.workerCount?.toString().orEmpty()) }
     var unitPrice by remember(editing?.id) { mutableStateOf(editing?.unitPrice?.toString() ?: selectedProject?.mealPrice?.toString().orEmpty()) }
-    var date by remember(editing?.id) { mutableStateOf(editing?.date ?: PersianDateFormatter.todayStartMillis()) }
+    var date by remember(editing?.id) { mutableLongStateOf(editing?.date ?: PersianDateFormatter.todayStartMillis()) }
     var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
 

@@ -270,8 +270,8 @@ fun AppScaffold(
     onNavigate: (String) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
-    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    onBack: (() -> Unit)? = null,
     snackbarHostState: SnackbarHostState? = null,
     motionEnabled: Boolean = true,
     floatingAction: (@Composable () -> Unit)? = null,
@@ -301,8 +301,8 @@ fun PremiumScaffold(
     onNavigate: (String) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
-    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    onBack: (() -> Unit)? = null,
     snackbarHostState: SnackbarHostState? = null,
     motionEnabled: Boolean = true,
     floatingAction: (@Composable () -> Unit)? = null,
@@ -1222,8 +1222,8 @@ fun EmptyStateCard(
 
 @Composable
 fun LoadingState(
-    message: String = "در حال بارگذاری...",
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    message: String = "در حال بارگذاری..."
 ) {
     GlassCard(modifier = modifier.fillMaxWidth(), accent = Gold) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1522,6 +1522,8 @@ fun <T> OptionSelector(
     selected: T?,
     optionLabel: (T) -> String,
     modifier: Modifier = Modifier,
+    clearLabel: String? = null,
+    onClear: (() -> Unit)? = null,
     onSelected: (T) -> Unit
 ) {
     AppDropdownField(
@@ -1530,6 +1532,8 @@ fun <T> OptionSelector(
         selected = selected,
         optionLabel = optionLabel,
         modifier = modifier,
+        clearLabel = clearLabel,
+        onClear = onClear,
         onSelected = onSelected
     )
 }
@@ -1541,6 +1545,8 @@ fun <T> AppDropdownField(
     selected: T?,
     optionLabel: (T) -> String,
     modifier: Modifier = Modifier,
+    clearLabel: String? = null,
+    onClear: (() -> Unit)? = null,
     onSelected: (T) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -1576,6 +1582,15 @@ fun <T> AppDropdownField(
                 .background(SurfaceGlassStrong)
                 .heightIn(max = 320.dp)
         ) {
+            if (onClear != null && clearLabel != null) {
+                DropdownMenuItem(
+                    text = { Text(clearLabel, color = TextSecondary) },
+                    onClick = {
+                        onClear()
+                        expanded = false
+                    }
+                )
+            }
             options.forEach { option ->
                 DropdownMenuItem(
                     text = { Text(optionLabel(option), color = TextPrimary) },

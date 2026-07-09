@@ -183,6 +183,9 @@ class RoomRestaurantRepository(
     override suspend fun saveMaterial(entity: MaterialEntity): Long {
         require(entity.name.isNotBlank()) { "نام متریال الزامی است" }
         require(entity.minimumStock >= 0.0) { "حداقل موجودی نمی‌تواند منفی باشد" }
+        entity.categoryId?.let { categoryId ->
+            require(currentSnapshot().materialCategories.any { it.id == categoryId }) { "دسته‌بندی متریال معتبر نیست" }
+        }
         val now = PersianDateFormatter.nowMillis()
         return dao.insertMaterial(
             entity.copy(
@@ -279,12 +282,17 @@ class RoomRestaurantRepository(
             require(input.discountAmount <= subtotal) { "تخفیف نمی‌تواند بیشتر از جمع آیتم‌ها باشد" }
             val snapshot = currentSnapshot()
             val existing = snapshot.purchases.firstOrNull { it.id == input.id }
+            val existingItemMaterialIds = if (existing == null) {
+                emptySet()
+            } else {
+                snapshot.purchaseItems.filter { it.purchaseId == existing.id }.map { it.materialId }.toSet()
+            }
             require(input.id == 0L || existing != null) { "فاکتور خرید برای ویرایش پیدا نشد" }
-            require(snapshot.warehouses.any { it.id == input.warehouseId && it.isActive }) {
+            require(snapshot.warehouses.any { it.id == input.warehouseId && (it.isActive || it.id == existing?.warehouseId) }) {
                 "انبار مقصد معتبر نیست"
             }
             input.supplierId?.let { supplierId ->
-                require(snapshot.suppliers.any { it.id == supplierId && it.isActive }) { "تامین‌کننده معتبر نیست" }
+                require(snapshot.suppliers.any { it.id == supplierId && (it.isActive || it.id == existing?.supplierId) }) { "تامین‌کننده معتبر نیست" }
             }
             require(input.paymentType != PurchasePaymentType.CREDIT || input.supplierId != null) {
                 "برای خرید نسیه باید تامین‌کننده انتخاب شود"
@@ -294,9 +302,9 @@ class RoomRestaurantRepository(
                 "برای خرید کارتی باید کارت بانکی انتخاب شود"
             }
             normalizedCardId?.let { cardId ->
-                require(snapshot.bankCards.any { it.id == cardId && it.isActive }) { "کارت بانکی معتبر نیست" }
+                require(snapshot.bankCards.any { it.id == cardId && (it.isActive || it.id == existing?.bankCardId) }) { "کارت بانکی معتبر نیست" }
             }
-            require(input.items.all { item -> snapshot.materials.any { it.id == item.materialId && it.isActive && it.mainUnit == item.unit } }) {
+            require(input.items.all { item -> snapshot.materials.any { it.id == item.materialId && (it.isActive || it.id in existingItemMaterialIds) && it.mainUnit == item.unit } }) {
                 "همه آیتم‌های فاکتور باید متریال فعال و واحد معتبر داشته باشند"
             }
             val normalizedInvoice = input.invoiceNumber?.trim()?.ifBlank { null }
@@ -394,11 +402,12 @@ class RoomRestaurantRepository(
             val existing = snapshot.projectPayments.firstOrNull { it.id == input.id }
             require(input.id == 0L || existing != null) { "دریافت پروژه برای ویرایش پیدا نشد" }
             require(snapshot.projects.any { it.id == input.projectId }) { "پروژه معتبر نیست" }
-            require(input.method == PaymentMethod.CASH || input.bankCardId != null) {
+            val normalizedCardId = if (input.method == PaymentMethod.CASH) null else input.bankCardId
+            require(input.method == PaymentMethod.CASH || normalizedCardId != null) {
                 "برای دریافت غیرنقدی باید کارت بانکی انتخاب شود"
             }
-            input.bankCardId?.let { cardId ->
-                require(snapshot.bankCards.any { it.id == cardId && it.isActive }) { "کارت بانکی معتبر نیست" }
+            normalizedCardId?.let { cardId ->
+                require(snapshot.bankCards.any { it.id == cardId && (it.isActive || it.id == existing?.bankCardId) }) { "کارت بانکی معتبر نیست" }
             }
             val finance = ProjectFinanceUseCase(this).calculateProjectFinances(snapshot)
                 .firstOrNull { it.project.id == input.projectId }
@@ -411,7 +420,7 @@ class RoomRestaurantRepository(
                 ProjectPaymentEntity(
                     id = input.id,
                     projectId = input.projectId,
-                    bankCardId = input.bankCardId,
+                    bankCardId = normalizedCardId,
                     amount = input.amount,
                     date = input.date,
                     method = input.method,
@@ -428,12 +437,13 @@ class RoomRestaurantRepository(
             val snapshot = currentSnapshot()
             val existing = snapshot.supplierPayments.firstOrNull { it.id == input.id }
             require(input.id == 0L || existing != null) { "پرداخت تامین‌کننده برای ویرایش پیدا نشد" }
-            require(snapshot.suppliers.any { it.id == input.supplierId && it.isActive }) { "تامین‌کننده معتبر نیست" }
-            require(input.method == PaymentMethod.CASH || input.bankCardId != null) {
+            require(snapshot.suppliers.any { it.id == input.supplierId && (it.isActive || it.id == existing?.supplierId) }) { "تامین‌کننده معتبر نیست" }
+            val normalizedCardId = if (input.method == PaymentMethod.CASH) null else input.bankCardId
+            require(input.method == PaymentMethod.CASH || normalizedCardId != null) {
                 "برای پرداخت غیرنقدی باید کارت بانکی انتخاب شود"
             }
-            input.bankCardId?.let { cardId ->
-                require(snapshot.bankCards.any { it.id == cardId && it.isActive }) { "کارت بانکی معتبر نیست" }
+            normalizedCardId?.let { cardId ->
+                require(snapshot.bankCards.any { it.id == cardId && (it.isActive || it.id == existing?.bankCardId) }) { "کارت بانکی معتبر نیست" }
             }
             val debt = SupplierDebtUseCase(this).calculateSupplierDebts(snapshot)
                 .firstOrNull { it.supplier.id == input.supplierId }
@@ -446,7 +456,7 @@ class RoomRestaurantRepository(
                 SupplierPaymentEntity(
                     id = input.id,
                     supplierId = input.supplierId,
-                    bankCardId = input.bankCardId,
+                    bankCardId = normalizedCardId,
                     amount = input.amount,
                     date = input.date,
                     method = input.method,
@@ -460,8 +470,11 @@ class RoomRestaurantRepository(
     override suspend fun saveExpense(entity: ExpenseEntity): Long {
         require(entity.title.isNotBlank()) { "عنوان هزینه الزامی است" }
         require(entity.amount > 0) { "مبلغ هزینه باید بیشتر از صفر باشد" }
+        val snapshot = currentSnapshot()
+        val existing = snapshot.expenses.firstOrNull { it.id == entity.id }
+        require(entity.id == 0L || existing != null) { "هزینه برای ویرایش پیدا نشد" }
         entity.bankCardId?.let { cardId ->
-            require(currentSnapshot().bankCards.any { it.id == cardId && it.isActive }) { "کارت بانکی معتبر نیست" }
+            require(snapshot.bankCards.any { it.id == cardId && (it.isActive || it.id == existing?.bankCardId) }) { "کارت بانکی معتبر نیست" }
         }
         val now = PersianDateFormatter.nowMillis()
         return dao.insertExpense(

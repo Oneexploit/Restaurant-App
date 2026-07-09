@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -425,7 +426,7 @@ fun StockTransactionFormScreen(
     var material by remember { mutableStateOf(materials.firstOrNull()) }
     var quantity by remember { mutableStateOf("") }
     var unitPrice by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf(PersianDateFormatter.todayStartMillis()) }
+    var date by remember { mutableLongStateOf(PersianDateFormatter.todayStartMillis()) }
     var notes by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val availableStock = state.inventory
