@@ -32,6 +32,7 @@ import com.restaurant.offlinemanager.data.mapper.toEntity
 import com.restaurant.offlinemanager.domain.model.MealDeliveryInput
 import com.restaurant.offlinemanager.domain.model.ProjectInput
 import com.restaurant.offlinemanager.domain.model.ProjectPaymentInput
+import com.restaurant.offlinemanager.domain.model.PurchaseItemInput
 import com.restaurant.offlinemanager.domain.model.PurchaseInput
 import com.restaurant.offlinemanager.domain.model.RestaurantSnapshot
 import com.restaurant.offlinemanager.domain.model.StockTransactionInput
@@ -127,11 +128,13 @@ class RoomRestaurantRepository(
             require(input.unitPrice > 0) { "قیمت واحد باید بیشتر از صفر باشد" }
             val snapshot = currentSnapshot()
             val project = snapshot.projects.firstOrNull { it.id == input.projectId } ?: error("پروژه پیدا نشد")
-            require(project.status == ProjectStatus.ACTIVE) { "ثبت وعده فقط برای پروژه فعال مجاز است" }
+            val existing = snapshot.mealDeliveries.firstOrNull { it.id == input.id }
+            require(project.status == ProjectStatus.ACTIVE || existing?.projectId == input.projectId) {
+                "ثبت وعده فقط برای پروژه فعال مجاز است"
+            }
             require(snapshot.mealDeliveries.none { it.id != input.id && it.projectId == input.projectId && it.date == input.date && it.mealType == input.mealType }) {
                 "برای این پروژه، تاریخ و نوع وعده قبلا ثبت شده است"
             }
-            val existing = snapshot.mealDeliveries.firstOrNull { it.id == input.id }
             val now = PersianDateFormatter.nowMillis()
             dao.insertMealDelivery(
                 MealDeliveryEntity(
@@ -298,6 +301,12 @@ class RoomRestaurantRepository(
             val normalizedInvoice = input.invoiceNumber?.trim()?.ifBlank { null }
             require(normalizedInvoice == null || snapshot.purchases.none { it.id != input.id && it.supplierId == input.supplierId && it.invoiceNumber == normalizedInvoice }) {
                 "شماره فاکتور برای این تامین‌کننده قبلا ثبت شده است"
+            }
+            if (input.id != 0L) {
+                validateNonNegativeInventory(
+                    snapshot = snapshot,
+                    transactions = stockTransactionsReplacingPurchase(snapshot, input.id, input.warehouseId, input.items)
+                )
             }
             database.withTransaction {
                 val now = PersianDateFormatter.nowMillis()
@@ -471,14 +480,26 @@ class RoomRestaurantRepository(
 
     override suspend fun deleteStockTransaction(id: Long): Result<Unit> =
         runCatching {
-            val tx = dao.getStockTransaction(id) ?: error("تراکنش انبار پیدا نشد")
+            val snapshot = currentSnapshot()
+            val tx = snapshot.stockTransactions.firstOrNull { it.id == id }
+                ?: dao.getStockTransaction(id)
+                ?: error("تراکنش انبار پیدا نشد")
             require(tx.purchaseId == null) { "تراکنش‌های خودکار خرید را از خود فاکتور خرید اصلاح یا حذف کنید" }
+            validateNonNegativeInventory(
+                snapshot = snapshot,
+                transactions = snapshot.stockTransactions.filterNot { it.id == id }
+            )
             dao.deleteStockTransaction(id)
         }
 
     override suspend fun deletePurchase(id: Long): Result<Unit> =
         runCatching {
             dao.getPurchase(id) ?: error("فاکتور خرید پیدا نشد")
+            val snapshot = currentSnapshot()
+            validateNonNegativeInventory(
+                snapshot = snapshot,
+                transactions = snapshot.stockTransactions.filterNot { it.purchaseId == id }
+            )
             database.withTransaction {
                 dao.deleteStockTransactionsForPurchase(id)
                 dao.deletePurchaseItemsForPurchase(id)
@@ -565,6 +586,53 @@ private fun safeStoredCardNumber(value: String): String? {
     if (digits.isBlank()) return null
     return if (digits.length <= 8) digits else digits.take(4) + digits.takeLast(4)
 }
+
+private fun stockTransactionsReplacingPurchase(
+    snapshot: RestaurantSnapshot,
+    purchaseId: Long,
+    warehouseId: Long,
+    items: List<PurchaseItemInput>
+): List<StockTransactionEntity> {
+    val replacementTransactions = items.map { item ->
+        StockTransactionEntity(
+            warehouseId = warehouseId,
+            materialId = item.materialId,
+            purchaseId = purchaseId,
+            type = StockTransactionType.IN,
+            reason = StockReason.PURCHASE,
+            quantity = item.quantity,
+            unit = item.unit,
+            date = PersianDateFormatter.nowMillis(),
+            createdAt = 0L,
+            updatedAt = 0L
+        )
+    }
+    return snapshot.stockTransactions.filterNot { it.purchaseId == purchaseId } + replacementTransactions
+}
+
+private fun validateNonNegativeInventory(
+    snapshot: RestaurantSnapshot,
+    transactions: List<StockTransactionEntity>
+) {
+    val balances = mutableMapOf<Pair<Long, Long>, Double>()
+    transactions.forEach { tx ->
+        val key = tx.warehouseId to tx.materialId
+        balances[key] = (balances[key] ?: 0.0) + tx.signedQuantity()
+    }
+    val offender = balances.entries.firstOrNull { it.value < -0.000001 } ?: return
+    val warehouse = snapshot.warehouses.firstOrNull { it.id == offender.key.first }?.name ?: "انبار"
+    val material = snapshot.materials.firstOrNull { it.id == offender.key.second }?.name ?: "کالا"
+    require(false) {
+        "این تغییر موجودی $material در $warehouse را منفی می‌کند"
+    }
+}
+
+private fun StockTransactionEntity.signedQuantity(): Double =
+    when (type) {
+        StockTransactionType.IN, StockTransactionType.TRANSFER_IN -> quantity
+        StockTransactionType.OUT, StockTransactionType.TRANSFER_OUT, StockTransactionType.WASTE -> -quantity
+        StockTransactionType.ADJUSTMENT -> quantity
+    }
 
 private object BackupJson {
     fun encode(snapshot: RestaurantSnapshot): String {
@@ -883,6 +951,7 @@ private object BackupJson {
         }) {
             "فایل پشتیبان مقدار تراکنش انبار نامعتبر دارد"
         }
+        validateNonNegativeInventory(snapshot, snapshot.stockTransactions)
         require(snapshot.projectPayments.all {
             it.projectId in projectIds && (it.bankCardId == null || it.bankCardId in bankCardIds) && it.amount > 0
         }) {
