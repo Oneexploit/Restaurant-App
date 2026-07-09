@@ -16,13 +16,17 @@ private val Context.appSettingsDataStore: DataStore<Preferences> by preferencesD
 
 data class AppSettings(
     val lowStockNotificationsEnabled: Boolean = true,
-    val reducedMotionEnabled: Boolean = false
+    val reducedMotionEnabled: Boolean = false,
+    val appLockEnabled: Boolean = false,
+    val importantNotificationsEnabled: Boolean = false
 )
 
 class AppSettingsRepository(private val context: Context) {
     private object Keys {
         val LowStockNotificationsEnabled = booleanPreferencesKey("low_stock_notifications_enabled")
         val ReducedMotionEnabled = booleanPreferencesKey("reduced_motion_enabled")
+        val AppLockEnabled = booleanPreferencesKey("app_lock_enabled")
+        val ImportantNotificationsEnabled = booleanPreferencesKey("important_notifications_enabled")
     }
 
     val settings: Flow<AppSettings> = context.appSettingsDataStore.data
@@ -32,7 +36,9 @@ class AppSettingsRepository(private val context: Context) {
         .map { preferences ->
             AppSettings(
                 lowStockNotificationsEnabled = preferences[Keys.LowStockNotificationsEnabled] ?: true,
-                reducedMotionEnabled = preferences[Keys.ReducedMotionEnabled] ?: false
+                reducedMotionEnabled = preferences[Keys.ReducedMotionEnabled] ?: false,
+                appLockEnabled = preferences[Keys.AppLockEnabled] ?: false,
+                importantNotificationsEnabled = preferences[Keys.ImportantNotificationsEnabled] ?: false
             )
         }
 
@@ -42,5 +48,13 @@ class AppSettingsRepository(private val context: Context) {
 
     suspend fun setReducedMotion(enabled: Boolean) {
         context.appSettingsDataStore.edit { it[Keys.ReducedMotionEnabled] = enabled }
+    }
+
+    suspend fun setAppLock(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[Keys.AppLockEnabled] = enabled }
+    }
+
+    suspend fun setImportantNotifications(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[Keys.ImportantNotificationsEnabled] = enabled }
     }
 }

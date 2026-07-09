@@ -7,6 +7,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.restaurant.offlinemanager.core.notifications.AppNotificationScheduler
 import com.restaurant.offlinemanager.data.local.entity.BankCardEntity
 import com.restaurant.offlinemanager.data.local.entity.ExpenseEntity
 import com.restaurant.offlinemanager.data.local.entity.MaterialCategoryEntity
@@ -30,10 +31,12 @@ import com.restaurant.offlinemanager.domain.model.SupplierDebt
 import com.restaurant.offlinemanager.domain.model.SupplierPaymentInput
 import com.restaurant.offlinemanager.domain.repository.RestaurantRepository
 import com.restaurant.offlinemanager.domain.usecase.AppUseCases
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -70,6 +73,19 @@ class RestaurantViewModel(
     val messages: SharedFlow<String> = _messages
 
     val uiState = combine(repository.observeSnapshot(), settingsRepository.settings) { snapshot, settings ->
+        buildUiState(snapshot, settings)
+    }.catch { error ->
+        if (error is CancellationException) throw error
+        _messages.tryEmit(error.userFacingMessage("خطا در بارگذاری داده‌ها رخ داد"))
+        emit(AppUiState(isLoading = false))
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = AppUiState()
+    )
+
+    private fun buildUiState(snapshot: RestaurantSnapshot, settings: AppSettings): AppUiState =
+        try {
         AppUiState(
             isLoading = false,
             snapshot = snapshot,
@@ -81,11 +97,15 @@ class RestaurantViewModel(
             bankBalances = useCases.bankCards.calculateBalances(snapshot),
             monthlyPoints = useCases.reports.monthlySummary(snapshot)
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.Eagerly,
-        initialValue = AppUiState()
-    )
+    } catch (error: Throwable) {
+        if (error is CancellationException) throw error
+        _messages.tryEmit(error.userFacingMessage("خطا در آماده‌سازی اطلاعات رخ داد"))
+        AppUiState(
+            isLoading = false,
+            snapshot = snapshot,
+            settings = settings
+        )
+    }
 
     fun saveProject(input: ProjectInput, onSuccess: () -> Unit = {}) = ioAction("پروژه ذخیره شد", onSuccess) {
         repository.saveProject(input)
@@ -149,6 +169,21 @@ class RestaurantViewModel(
 
     fun setReducedMotion(enabled: Boolean) = ioAction("تنظیمات حرکت ذخیره شد") {
         settingsRepository.setReducedMotion(enabled)
+    }
+
+    fun setAppLock(enabled: Boolean) = ioAction(if (enabled) "قفل برنامه فعال شد" else "قفل برنامه غیرفعال شد") {
+        settingsRepository.setAppLock(enabled)
+    }
+
+    fun setImportantNotifications(context: Context, enabled: Boolean) = ioAction(
+        if (enabled) "نوتیفیکیشن‌های مهم فعال شد" else "نوتیفیکیشن‌های مهم غیرفعال شد"
+    ) {
+        settingsRepository.setImportantNotifications(enabled)
+        if (enabled) {
+            AppNotificationScheduler.schedule(context.applicationContext)
+        } else {
+            AppNotificationScheduler.cancel(context.applicationContext)
+        }
     }
 
     fun exportBackup(context: Context) = ioAction("پشتیبان JSON ذخیره شد") {
@@ -229,10 +264,14 @@ class RestaurantViewModel(
                     onSuccess()
                 }
             } catch (error: Throwable) {
-                _messages.emit(error.message ?: "خطای ناشناخته رخ داد")
+                if (error is CancellationException) throw error
+                _messages.emit(error.userFacingMessage("خطای ناشناخته رخ داد"))
             }
         }
     }
+
+    private fun Throwable.userFacingMessage(fallback: String): String =
+        message?.takeIf { it.isNotBlank() } ?: fallback
 
     private suspend fun shareFile(context: Context, file: File, mimeType: String) {
         withContext(Dispatchers.Main) {

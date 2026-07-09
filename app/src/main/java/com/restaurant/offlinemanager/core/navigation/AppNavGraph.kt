@@ -1,5 +1,6 @@
 package com.restaurant.offlinemanager.core.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
@@ -13,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -23,6 +25,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.restaurant.offlinemanager.core.design.AppScaffold
+import com.restaurant.offlinemanager.core.security.AppLockGate
 import com.restaurant.offlinemanager.data.local.entity.StockTransactionType
 import com.restaurant.offlinemanager.ui.RestaurantViewModel
 import com.restaurant.offlinemanager.ui.finance.BankCardFormScreen
@@ -47,6 +50,7 @@ import com.restaurant.offlinemanager.ui.warehouse.MaterialCategoryFormScreen
 import com.restaurant.offlinemanager.ui.warehouse.StockTransactionFormScreen
 import com.restaurant.offlinemanager.ui.warehouse.WarehouseFormScreen
 import com.restaurant.offlinemanager.ui.warehouse.WarehouseMainScreen
+import kotlinx.coroutines.launch
 
 @Composable
 fun AppNavGraph(viewModel: RestaurantViewModel) {
@@ -54,17 +58,39 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val topLevelRoutes = remember { BottomDestinations.map { it.route }.toSet() + Routes.Home }
     val showBack = currentRoute != null && currentRoute !in topLevelRoutes
     val motionEnabled = !state.settings.reducedMotionEnabled
+    fun navigateBackInsideApp() {
+        if (!navController.popBackStack()) {
+            navController.navigate(Routes.Home) {
+                launchSingleTop = true
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
 
-    AppScaffold(
+    BackHandler {
+        if (showBack) {
+            navigateBackInsideApp()
+        } else {
+            scope.launch {
+                snackbarHostState.showSnackbar("برنامه باز می‌ماند؛ برای خروج از دکمه Home دستگاه استفاده کنید")
+            }
+        }
+    }
+
+    AppLockGate(
+        appLockEnabled = state.settings.appLockEnabled,
+        settingsReady = !state.isLoading
+    ) {
+        AppScaffold(
         title = titleFor(currentRoute),
         currentRoute = bottomRouteFor(currentRoute),
         bottomDestinations = BottomDestinations,
@@ -77,11 +103,11 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
         },
         onOpenSettings = { navController.navigate(Routes.Settings) },
         onOpenSearch = { navController.navigate(Routes.GlobalSearch) },
-        onBack = if (showBack) ({ navController.popBackStack() }) else null,
+        onBack = if (showBack) ({ navigateBackInsideApp() }) else null,
         snackbarHostState = snackbarHostState,
         motionEnabled = motionEnabled
-    ) { padding ->
-        NavHost(
+        ) { padding ->
+            NavHost(
             navController = navController,
             startDestination = Routes.Home,
             modifier = Modifier.padding(padding),
@@ -361,6 +387,8 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                 SettingsScreen(
                     state = state,
                     context = context,
+                    onAppLock = viewModel::setAppLock,
+                    onImportantNotifications = viewModel::setImportantNotifications,
                     onLowStockNotifications = viewModel::setLowStockNotifications,
                     onReducedMotion = viewModel::setReducedMotion,
                     onExportBackup = viewModel::exportBackup,
@@ -368,6 +396,7 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                 )
             }
         }
+    }
     }
 }
 
