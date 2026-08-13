@@ -49,6 +49,7 @@ import com.restaurant.offlinemanager.core.design.GoldPrimaryButton
 import com.restaurant.offlinemanager.core.design.LocalDateSelector
 import com.restaurant.offlinemanager.core.design.MoneyField
 import com.restaurant.offlinemanager.core.design.MoneyText
+import com.restaurant.offlinemanager.core.design.MotionVisibility
 import com.restaurant.offlinemanager.core.design.OptionSelector
 import com.restaurant.offlinemanager.core.design.PersianDateText
 import com.restaurant.offlinemanager.core.design.QuantityField
@@ -298,9 +299,11 @@ fun PurchaseFormScreen(
                     selected = paymentType.label(),
                     onSelected = { label -> paymentType = PurchasePaymentType.entries.first { it.label() == label } }
                 )
-                if (paymentType == PurchasePaymentType.CARD) {
-                    Spacer(Modifier.height(10.dp))
-                    OptionSelector("کارت بانکی", cards, card, { it.title }) { card = it }
+                MotionVisibility(paymentType == PurchasePaymentType.CARD) {
+                    Column {
+                        Spacer(Modifier.height(10.dp))
+                        OptionSelector("کارت بانکی", cards, card, { it.title }) { card = it }
+                    }
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

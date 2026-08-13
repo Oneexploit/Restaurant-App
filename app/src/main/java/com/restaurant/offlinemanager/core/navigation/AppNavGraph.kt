@@ -104,7 +104,8 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
         onOpenSearch = { navController.navigate(Routes.GlobalSearch) },
         onBack = if (showBack) ({ navigateBackInsideApp() }) else null,
         snackbarHostState = snackbarHostState,
-        motionEnabled = motionEnabled
+        motionEnabled = motionEnabled,
+        isBusy = state.isSaving
         ) { padding ->
             NavHost(
             navController = navController,

@@ -27,6 +27,8 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
@@ -49,6 +51,7 @@ import com.restaurant.offlinemanager.core.design.LocalDateSelector
 import com.restaurant.offlinemanager.core.design.MetricProgressBar
 import com.restaurant.offlinemanager.core.design.MoneyField
 import com.restaurant.offlinemanager.core.design.MoneyText
+import com.restaurant.offlinemanager.core.design.MotionContent
 import com.restaurant.offlinemanager.core.design.OptionSelector
 import com.restaurant.offlinemanager.core.design.PersianDateText
 import com.restaurant.offlinemanager.core.design.QuantityField
@@ -102,11 +105,13 @@ fun WarehouseMainScreen(
     ) {
         FilterChipRow(tabs, tabs[tab], { tab = tabs.indexOf(it) })
         Spacer(Modifier.height(12.dp))
-        when (tab) {
-            0 -> InventoryTab(state, onStockIn, onStockOut, onTransfer, onWaste, onAdjustment)
-            1 -> WarehousesTab(state, onAddWarehouse, onEditWarehouse, onDeleteWarehouse)
-            2 -> TransactionsTab(state, onDeleteStockTransaction)
-            3 -> MaterialsTab(state, onAddMaterial, onEditMaterial, onDeleteMaterial)
+        MotionContent(targetState = tab, modifier = Modifier.weight(1f)) { selectedTab ->
+            when (selectedTab) {
+                0 -> InventoryTab(state, onStockIn, onStockOut, onTransfer, onWaste, onAdjustment)
+                1 -> WarehousesTab(state, onAddWarehouse, onEditWarehouse, onDeleteWarehouse)
+                2 -> TransactionsTab(state, onDeleteStockTransaction)
+                else -> MaterialsTab(state, onAddMaterial, onEditMaterial, onDeleteMaterial)
+            }
         }
     }
 }
@@ -197,7 +202,12 @@ private fun InventoryTab(
 
 @Composable
 private fun InventoryCard(item: InventoryItem, onStockIn: () -> Unit, onStockOut: () -> Unit) {
-    GlassCard(Modifier.fillMaxWidth(), accent = if (item.isLowStock) AppOrange else AppCyan) {
+    val accent by animateColorAsState(
+        targetValue = if (item.isLowStock) AppOrange else AppCyan,
+        animationSpec = tween(420),
+        label = "inventoryRiskColor"
+    )
+    GlassCard(Modifier.fillMaxWidth(), accent = accent) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(item.emoji ?: "•", style = MaterialTheme.typography.headlineMedium)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {

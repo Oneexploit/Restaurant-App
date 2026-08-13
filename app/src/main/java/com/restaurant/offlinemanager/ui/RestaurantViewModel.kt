@@ -35,6 +35,7 @@ import com.restaurant.offlinemanager.domain.usecase.AppUseCases
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.catch
@@ -46,6 +47,7 @@ import java.io.File
 
 data class AppUiState(
     val isLoading: Boolean = true,
+    val isSaving: Boolean = false,
     val snapshot: RestaurantSnapshot = RestaurantSnapshot(),
     val settings: AppSettings = AppSettings(),
     val dashboard: DashboardStats = DashboardStats(),
@@ -77,9 +79,10 @@ class RestaurantViewModel(
 ) : ViewModel() {
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val messages: SharedFlow<String> = _messages
+    private val activeOperations = MutableStateFlow(0)
 
-    val uiState = combine(repository.observeSnapshot(), settingsRepository.settings) { snapshot, settings ->
-        buildUiState(snapshot, settings)
+    val uiState = combine(repository.observeSnapshot(), settingsRepository.settings, activeOperations) { snapshot, settings, operations ->
+        buildUiState(snapshot, settings).copy(isSaving = operations > 0)
     }.catch { error ->
         if (error is CancellationException) throw error
         _messages.tryEmit(error.userFacingMessage("خطا در بارگذاری داده‌ها رخ داد"))
@@ -259,6 +262,8 @@ class RestaurantViewModel(
     }
 
     private fun ioAction(success: String, onSuccess: () -> Unit = {}, block: suspend () -> Unit) {
+        if (activeOperations.value > 0) return
+        activeOperations.value = 1
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 block()
@@ -269,6 +274,8 @@ class RestaurantViewModel(
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 _messages.emit(error.userFacingMessage("خطای ناشناخته رخ داد"))
+            } finally {
+                activeOperations.value = 0
             }
         }
     }

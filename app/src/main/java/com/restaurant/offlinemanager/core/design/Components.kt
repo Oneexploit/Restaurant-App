@@ -1,6 +1,7 @@
 package com.restaurant.offlinemanager.core.design
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -14,6 +15,10 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -74,6 +79,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -101,6 +107,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -173,7 +181,49 @@ private fun Modifier.cardEntrance(): Modifier {
         this.alpha = alpha
         scaleX = scale
         scaleY = scale
+        translationY = (1f - alpha) * 18f
     }
+}
+
+@Composable
+fun MotionVisibility(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val motionEnabled = LocalMotionEnabled.current
+    if (!motionEnabled) {
+        if (visible) Box(modifier) { content() }
+        return
+    }
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = fadeIn(tween(220)) + expandVertically(tween(260)) + slideInVertically(tween(260)) { it / 5 },
+        exit = fadeOut(tween(140)) + shrinkVertically(tween(220)) + slideOutVertically(tween(180)) { -it / 8 }
+    ) { content() }
+}
+
+@Composable
+fun <T> MotionContent(
+    targetState: T,
+    modifier: Modifier = Modifier,
+    content: @Composable (T) -> Unit
+) {
+    val motionEnabled = LocalMotionEnabled.current
+    if (!motionEnabled) {
+        Box(modifier) { content(targetState) }
+        return
+    }
+    AnimatedContent(
+        targetState = targetState,
+        modifier = modifier,
+        transitionSpec = {
+            (fadeIn(tween(220)) + slideInVertically(tween(280)) { it / 7 }) togetherWith
+                (fadeOut(tween(140)) + slideOutVertically(tween(200)) { -it / 9 })
+        },
+        label = "motionContent"
+    ) { state -> content(state) }
 }
 
 @Composable
@@ -274,6 +324,7 @@ fun AppScaffold(
     onBack: (() -> Unit)? = null,
     snackbarHostState: SnackbarHostState? = null,
     motionEnabled: Boolean = true,
+    isBusy: Boolean = false,
     floatingAction: (@Composable () -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit
 ) {
@@ -288,6 +339,7 @@ fun AppScaffold(
         modifier = modifier,
         snackbarHostState = snackbarHostState,
         motionEnabled = motionEnabled,
+        isBusy = isBusy,
         floatingAction = floatingAction,
         content = content
     )
@@ -305,6 +357,7 @@ fun PremiumScaffold(
     onBack: (() -> Unit)? = null,
     snackbarHostState: SnackbarHostState? = null,
     motionEnabled: Boolean = true,
+    isBusy: Boolean = false,
     floatingAction: (@Composable () -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit
 ) {
@@ -337,6 +390,19 @@ fun PremiumScaffold(
                 floatingActionButton = { floatingAction?.invoke() },
                 content = content
             )
+            MotionVisibility(
+                visible = isBusy,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 66.dp, start = 22.dp, end = 22.dp)
+            ) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)),
+                    color = Gold,
+                    trackColor = SurfaceGlassStrong
+                )
+            }
         }
     }
 }
@@ -639,7 +705,10 @@ fun StatCard(
                 Text(title, color = TextSecondary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 AnimatedContent(
                     targetState = value,
-                    transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
+                    transitionSpec = {
+                        (fadeIn(tween(220)) + slideInVertically(tween(260)) { it / 2 }) togetherWith
+                            (fadeOut(tween(130)) + slideOutVertically(tween(180)) { -it / 2 })
+                    },
                     label = "statValue"
                 ) { targetValue ->
                     Text(
@@ -677,7 +746,10 @@ fun MiniStatCard(
                 Text(title, color = TextSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1)
                 AnimatedContent(
                     targetState = value,
-                    transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(110)) },
+                    transitionSpec = {
+                        (fadeIn(tween(200)) + slideInVertically(tween(240)) { it / 2 }) togetherWith
+                            (fadeOut(tween(120)) + slideOutVertically(tween(170)) { -it / 2 })
+                    },
                     label = "miniStatValue"
                 ) { targetValue ->
                     Text(targetValue, color = TextPrimary, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -985,6 +1057,7 @@ fun PremiumBottomNavigation(
     onNavigate: (String) -> Unit
 ) {
     val motionEnabled = LocalMotionEnabled.current
+    val haptics = LocalHapticFeedback.current
     NavigationBar(
         modifier = Modifier
             .padding(horizontal = 12.dp)
@@ -1017,7 +1090,12 @@ fun PremiumBottomNavigation(
             val iconColor = if (motionEnabled) animatedIconColor else if (selected) Gold else TextMuted
             NavigationBarItem(
                 selected = selected,
-                onClick = { onNavigate(destination.route) },
+                onClick = {
+                    if (!selected) {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onNavigate(destination.route)
+                    }
+                },
                 alwaysShowLabel = selected,
                 icon = {
                     Icon(
@@ -1102,7 +1180,11 @@ fun MoneyText(
     AnimatedContent(
         targetState = amount,
         modifier = modifier,
-        transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
+        transitionSpec = {
+            val direction = if (targetState >= initialState) 1 else -1
+            (fadeIn(tween(240)) + slideInVertically(tween(300)) { direction * it / 2 }) togetherWith
+                (fadeOut(tween(150)) + slideOutVertically(tween(220)) { -direction * it / 2 })
+        },
         label = "moneyText"
     ) { targetAmount ->
         Text(

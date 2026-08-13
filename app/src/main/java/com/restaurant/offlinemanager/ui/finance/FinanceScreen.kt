@@ -62,6 +62,7 @@ import com.restaurant.offlinemanager.core.design.LocalDateSelector
 import com.restaurant.offlinemanager.core.design.MetricProgressBar
 import com.restaurant.offlinemanager.core.design.MoneyField
 import com.restaurant.offlinemanager.core.design.MoneyText
+import com.restaurant.offlinemanager.core.design.MotionVisibility
 import com.restaurant.offlinemanager.core.design.OptionSelector
 import com.restaurant.offlinemanager.core.design.PersianDateText
 import com.restaurant.offlinemanager.core.design.SectionHeader
@@ -698,12 +699,14 @@ private fun <T> PaymentFormLayout(
                 MoneyField(amount, onAmount, "مبلغ")
                 Spacer(Modifier.height(10.dp))
                 OptionSelector("روش پرداخت", PaymentMethod.entries, method, { it.label() }, onSelected = onMethod)
-                if (method != PaymentMethod.CASH) {
-                    Spacer(Modifier.height(10.dp))
-                    OptionSelector("کارت بانکی", cards, card, { it.title }, onSelected = onCard)
-                    if (cards.isEmpty()) {
-                        Spacer(Modifier.height(6.dp))
-                        Text("برای پرداخت غیرنقدی ابتدا یک کارت بانکی اضافه کنید.", color = AppRed)
+                MotionVisibility(method != PaymentMethod.CASH) {
+                    Column {
+                        Spacer(Modifier.height(10.dp))
+                        OptionSelector("کارت بانکی", cards, card, { it.title }, onSelected = onCard)
+                        if (cards.isEmpty()) {
+                            Spacer(Modifier.height(6.dp))
+                            Text("برای پرداخت غیرنقدی ابتدا یک کارت بانکی اضافه کنید.", color = AppRed)
+                        }
                     }
                 }
                 Spacer(Modifier.height(10.dp))
