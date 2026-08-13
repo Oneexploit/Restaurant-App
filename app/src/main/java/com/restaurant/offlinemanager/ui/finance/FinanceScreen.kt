@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -577,11 +578,28 @@ fun SupplierPaymentFormScreen(
     var date by remember(editing?.id) { mutableLongStateOf(editing?.date ?: PersianDateFormatter.todayStartMillis()) }
     var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
+    val purchaseOptions = state.snapshot.purchases.filter { purchase ->
+        if (purchase.supplierId != supplier?.id) return@filter false
+        val allocated = state.snapshot.supplierPayments
+            .filter { it.purchaseId == purchase.id && it.id != editing?.id }
+            .sumOf { it.amount }
+        purchase.totalAmount - purchase.paidAmount - allocated > 0 || purchase.id == editing?.purchaseId
+    }
+    var purchase by remember(editing?.id, supplier?.id, purchaseOptions) {
+        mutableStateOf(purchaseOptions.firstOrNull { it.id == editing?.purchaseId })
+    }
     val remaining = state.supplierDebts
         .firstOrNull { it.supplier.id == supplier?.id }
         ?.remaining
         ?.coerceAtLeast(0) ?: 0L
-    val editableRemaining = remaining + (editing?.takeIf { it.supplierId == supplier?.id }?.amount ?: 0L)
+    val supplierEditableRemaining = remaining + (editing?.takeIf { it.supplierId == supplier?.id }?.amount ?: 0L)
+    val invoiceEditableRemaining = purchase?.let { selected ->
+        val allocated = state.snapshot.supplierPayments
+            .filter { it.purchaseId == selected.id && it.id != editing?.id }
+            .sumOf { it.amount }
+        (selected.totalAmount - selected.paidAmount - allocated).coerceAtLeast(0)
+    }
+    val editableRemaining = invoiceEditableRemaining ?: supplierEditableRemaining
     PaymentFormLayout(
         title = if (editing == null) "ثبت پرداخت به تامین‌کننده" else "ویرایش پرداخت تامین‌کننده",
         partyLabel = "تامین‌کننده",
@@ -603,6 +621,17 @@ fun SupplierPaymentFormScreen(
         error = error,
         balanceLabel = "مانده بدهی",
         balanceAmount = editableRemaining,
+        additionalContent = {
+            Spacer(Modifier.height(10.dp))
+            OptionSelector(
+                "تخصیص به فاکتور (اختیاری)",
+                purchaseOptions,
+                purchase,
+                { invoice -> invoice.invoiceNumber?.let { "فاکتور $it" } ?: "فاکتور ${invoice.id}" },
+                clearLabel = "پرداخت کلی تامین‌کننده",
+                onClear = { purchase = null }
+            ) { purchase = it }
+        },
         onSave = {
             val value = MoneyFormatter.parse(amount)
             error = when {
@@ -614,7 +643,7 @@ fun SupplierPaymentFormScreen(
             }
             val s = supplier
             if (error == null && s != null) {
-                onSave(SupplierPaymentInput(id = editing?.id ?: 0, supplierId = s.id, bankCardId = if (method == PaymentMethod.CASH) null else card?.id, amount = value, date = date, method = method, notes = notes))
+                onSave(SupplierPaymentInput(id = editing?.id ?: 0, supplierId = s.id, bankCardId = if (method == PaymentMethod.CASH) null else card?.id, purchaseId = purchase?.id, amount = value, date = date, method = method, notes = notes))
             }
         },
         modifier = modifier
@@ -644,7 +673,8 @@ private fun <T> PaymentFormLayout(
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
     balanceLabel: String? = null,
-    balanceAmount: Long? = null
+    balanceAmount: Long? = null,
+    additionalContent: @Composable ColumnScope.() -> Unit = {}
 ) {
     LazyColumn(
         modifier = modifier
@@ -656,6 +686,7 @@ private fun <T> PaymentFormLayout(
         item {
             GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
                 OptionSelector(partyLabel, parties, party, partyName, onSelected = onParty)
+                additionalContent()
                 if (balanceLabel != null && balanceAmount != null) {
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {

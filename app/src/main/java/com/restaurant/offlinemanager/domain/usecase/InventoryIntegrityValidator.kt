@@ -12,14 +12,15 @@ object InventoryIntegrityValidator {
         transactions: List<StockTransactionEntity>
     ) {
         val balances = mutableMapOf<Pair<Long, Long>, Double>()
-        transactions.forEach { transaction ->
+        val offender = transactions
+            .sortedWith(compareBy<StockTransactionEntity>({ it.date }, { it.createdAt }, { it.id }))
+            .firstOrNull { transaction ->
             val key = transaction.warehouseId to transaction.materialId
             balances[key] = (balances[key] ?: 0.0) + signedQuantity(transaction)
-        }
-
-        val offender = balances.entries.firstOrNull { it.value < -EPSILON } ?: return
-        val warehouse = snapshot.warehouses.firstOrNull { it.id == offender.key.first }?.name ?: "انبار"
-        val material = snapshot.materials.firstOrNull { it.id == offender.key.second }?.name ?: "کالا"
+            balances.getValue(key) < -EPSILON
+        } ?: return
+        val warehouse = snapshot.warehouses.firstOrNull { it.id == offender.warehouseId }?.name ?: "انبار"
+        val material = snapshot.materials.firstOrNull { it.id == offender.materialId }?.name ?: "کالا"
         require(false) {
             "این تغییر موجودی $material در $warehouse را منفی می‌کند"
         }

@@ -16,11 +16,13 @@ import com.restaurant.offlinemanager.data.local.entity.WarehouseEntity
 import com.restaurant.offlinemanager.data.repository.AppSettings
 import com.restaurant.offlinemanager.data.repository.AppSettingsRepository
 import com.restaurant.offlinemanager.domain.model.BankCardBalance
+import com.restaurant.offlinemanager.domain.model.AccountingSummary
 import com.restaurant.offlinemanager.domain.model.DashboardStats
 import com.restaurant.offlinemanager.domain.model.InventoryItem
 import com.restaurant.offlinemanager.domain.model.MealDeliveryInput
 import com.restaurant.offlinemanager.domain.model.MonthlyPoint
 import com.restaurant.offlinemanager.domain.model.ProjectFinance
+import com.restaurant.offlinemanager.domain.model.ProjectProfit
 import com.restaurant.offlinemanager.domain.model.ProjectInput
 import com.restaurant.offlinemanager.domain.model.ProjectPaymentInput
 import com.restaurant.offlinemanager.domain.model.PurchaseInput
@@ -51,6 +53,8 @@ data class AppUiState(
     val projectFinances: List<ProjectFinance> = emptyList(),
     val supplierDebts: List<SupplierDebt> = emptyList(),
     val bankBalances: List<BankCardBalance> = emptyList(),
+    val accounting: AccountingSummary = AccountingSummary(),
+    val projectProfits: List<ProjectProfit> = emptyList(),
     val monthlyPoints: List<MonthlyPoint> = emptyList()
 )
 
@@ -60,7 +64,10 @@ enum class CsvReportType(val filePrefix: String, val successLabel: String) {
     RECEIVABLES("project-receivables", "گزارش مطالبات"),
     SUPPLIER_DEBTS("supplier-debts", "گزارش بدهی تامین‌کنندگان"),
     PAYMENTS("payments", "گزارش پرداخت‌ها"),
-    EXPENSES("expenses", "گزارش هزینه‌ها")
+    EXPENSES("expenses", "گزارش هزینه‌ها"),
+    PROFIT_LOSS("profit-loss", "گزارش سود و زیان"),
+    PROJECT_PROFIT("project-profit", "گزارش سود پروژه‌ها"),
+    CASH_FLOW("cash-flow", "گزارش جریان نقدی")
 }
 
 class RestaurantViewModel(
@@ -94,6 +101,8 @@ class RestaurantViewModel(
             projectFinances = useCases.projectFinance.calculateProjectFinances(snapshot),
             supplierDebts = useCases.supplierDebt.calculateSupplierDebts(snapshot),
             bankBalances = useCases.bankCards.calculateBalances(snapshot),
+            accounting = useCases.accounting.summary(snapshot),
+            projectProfits = useCases.accounting.projectProfits(snapshot),
             monthlyPoints = useCases.reports.monthlySummary(snapshot)
         )
     } catch (error: Throwable) {
@@ -200,6 +209,9 @@ class RestaurantViewModel(
             CsvReportType.SUPPLIER_DEBTS -> useCases.reports.supplierDebtsCsv(snapshot)
             CsvReportType.PAYMENTS -> useCases.reports.paymentsCsv(snapshot)
             CsvReportType.EXPENSES -> useCases.reports.expensesCsv(snapshot)
+            CsvReportType.PROFIT_LOSS -> useCases.reports.profitLossCsv(snapshot)
+            CsvReportType.PROJECT_PROFIT -> useCases.reports.projectProfitCsv(snapshot)
+            CsvReportType.CASH_FLOW -> useCases.reports.cashFlowCsv(snapshot)
         }
         val file = repository.exportCsv(context, "${type.filePrefix}-${System.currentTimeMillis()}.csv", csv)
         _messages.tryEmit("فایل CSV: ${file.absolutePath}")

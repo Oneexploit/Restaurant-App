@@ -205,6 +205,7 @@ private fun InventoryCard(item: InventoryItem, onStockIn: () -> Unit, onStockOut
                 Text(item.warehouseName, color = TextSecondary)
                 Text("موجودی: ${NumberFormatter.format(item.quantity)} ${item.unit.label()}", color = TextPrimary)
                 Text("حداقل: ${NumberFormatter.format(item.minimumStock)} ${item.unit.label()}", color = if (item.isLowStock) AppOrange else TextMuted)
+                Text("میانگین بها: ${MoneyFormatter.format(item.averageUnitCost)}", color = TextMuted)
             }
             Column(horizontalAlignment = Alignment.End) {
                 StatusChip(if (item.isLowStock) "کمبود" else "عادی", if (item.isLowStock) AppOrange else AppGreen)
@@ -416,9 +417,11 @@ fun StockTransactionFormScreen(
 ) {
     val warehouses = state.snapshot.warehouses.filter { it.isActive }
     val materials = state.snapshot.materials.filter { it.isActive }
+    val projects = state.snapshot.projects.filter { it.status == com.restaurant.offlinemanager.data.local.entity.ProjectStatus.ACTIVE }
     var fromWarehouse by remember { mutableStateOf(warehouses.firstOrNull()) }
     var toWarehouse by remember { mutableStateOf(warehouses.drop(1).firstOrNull() ?: warehouses.firstOrNull()) }
     var material by remember { mutableStateOf(materials.firstOrNull()) }
+    var project by remember { mutableStateOf<com.restaurant.offlinemanager.data.local.entity.ProjectEntity?>(null) }
     var quantity by remember { mutableStateOf("") }
     var unitPrice by remember { mutableStateOf("") }
     var date by remember { mutableLongStateOf(PersianDateFormatter.todayStartMillis()) }
@@ -427,6 +430,9 @@ fun StockTransactionFormScreen(
     val availableStock = state.inventory
         .firstOrNull { it.warehouseId == fromWarehouse?.id && it.materialId == material?.id }
         ?.quantity ?: 0.0
+    val currentAverageCost = state.inventory
+        .firstOrNull { it.warehouseId == fromWarehouse?.id && it.materialId == material?.id }
+        ?.averageUnitCost ?: 0L
     val isOutbound = mode == StockTransactionType.OUT || mode == StockTransactionType.TRANSFER_OUT || mode == StockTransactionType.WASTE
     val setupReady = warehouses.isNotEmpty() && materials.isNotEmpty()
 
@@ -469,6 +475,17 @@ fun StockTransactionFormScreen(
                 }
                 Spacer(Modifier.height(10.dp))
                 OptionSelector("متریال", materials, material, { it.name }) { material = it }
+                if (mode == StockTransactionType.OUT) {
+                    Spacer(Modifier.height(10.dp))
+                    OptionSelector(
+                        "پروژه مصرف‌کننده (اختیاری)",
+                        projects,
+                        project,
+                        { it.name },
+                        clearLabel = "مصرف عمومی",
+                        onClear = { project = null }
+                    ) { project = it }
+                }
                 if (isOutbound) {
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -517,13 +534,13 @@ fun StockTransactionFormScreen(
                         val input = StockTransactionInput(
                             warehouseId = wh.id,
                             materialId = mat.id,
-                            projectId = null,
+                            projectId = project?.id,
                             supplierId = null,
                             type = mode,
                             reason = if (mode == StockTransactionType.WASTE) StockReason.WASTE else if (mode == StockTransactionType.TRANSFER_OUT) StockReason.TRANSFER else StockReason.MANUAL_ADJUSTMENT,
                             quantity = qty,
                             unit = mat.mainUnit,
-                            unitPrice = price,
+                            unitPrice = price ?: currentAverageCost.takeIf { it > 0 },
                             date = date,
                             notes = notes
                         )

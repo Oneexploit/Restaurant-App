@@ -5,6 +5,7 @@ data class AppUseCases(
     val projectFinance: ProjectFinanceUseCase,
     val supplierDebt: SupplierDebtUseCase,
     val bankCards: BankCardBalanceUseCase,
+    val accounting: AccountingUseCase,
     val dashboard: DashboardUseCase,
     val reports: ReportsUseCase
 )

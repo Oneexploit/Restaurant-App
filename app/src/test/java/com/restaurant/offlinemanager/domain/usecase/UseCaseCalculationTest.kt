@@ -88,10 +88,10 @@ class UseCaseCalculationTest {
             materials = listOf(material),
             purchaseItems = listOf(purchaseItem(material.id, unitPrice = 100)),
             stockTransactions = listOf(
-                stock(warehouse.id, material.id, StockTransactionType.IN, 10.0),
-                stock(warehouse.id, material.id, StockTransactionType.OUT, 3.0),
-                stock(warehouse.id, material.id, StockTransactionType.WASTE, 1.0),
-                stock(warehouse.id, material.id, StockTransactionType.ADJUSTMENT, -2.0)
+                stock(warehouse.id, material.id, StockTransactionType.IN, 10.0).copy(id = 1, createdAt = now),
+                stock(warehouse.id, material.id, StockTransactionType.OUT, 3.0).copy(id = 2, createdAt = now + 1),
+                stock(warehouse.id, material.id, StockTransactionType.WASTE, 1.0).copy(id = 3, createdAt = now + 2),
+                stock(warehouse.id, material.id, StockTransactionType.ADJUSTMENT, -2.0).copy(id = 4, createdAt = now + 3)
             )
         )
         val useCase = InventoryUseCase(FakeRepository(snapshot))
@@ -139,6 +139,32 @@ class UseCaseCalculationTest {
     }
 
     @Test
+    fun inventoryUsesMovingWeightedAverageAndAllocatesPurchaseDiscount() {
+        val warehouse = warehouse()
+        val material = material()
+        val purchase = purchase(supplierId = 1, total = 180, paymentType = PurchasePaymentType.CASH)
+        val item = purchaseItem(material.id, unitPrice = 100).copy(purchaseId = purchase.id, quantity = 2.0, totalAmount = 200)
+        val snapshot = RestaurantSnapshot(
+            warehouses = listOf(warehouse),
+            materials = listOf(material),
+            purchases = listOf(purchase),
+            purchaseItems = listOf(item),
+            stockTransactions = listOf(
+                stock(warehouse.id, material.id, StockTransactionType.IN, 2.0).copy(id = 1, purchaseId = purchase.id, createdAt = now),
+                stock(warehouse.id, material.id, StockTransactionType.OUT, 1.0).copy(id = 2, createdAt = now + 1)
+            )
+        )
+        val inventory = InventoryUseCase(FakeRepository(snapshot))
+
+        val result = inventory.calculateInventory(snapshot).single()
+
+        assertEquals(1.0, result.quantity, 0.001)
+        assertEquals(90, result.averageUnitCost)
+        assertEquals(90, result.approximateValue)
+        assertEquals(90, inventory.costOfGoodsConsumed(snapshot))
+    }
+
+    @Test
     fun bankCardBalanceCombinesIncomeAndOutflows() {
         val card = bankCard(initial = 1_000)
         val snapshot = RestaurantSnapshot(
@@ -153,6 +179,38 @@ class UseCaseCalculationTest {
         val result = useCase.calculateBalances(snapshot).single()
 
         assertEquals(980, result.balance)
+    }
+
+    @Test
+    fun accountingSeparatesAccrualProfitFromCashFlow() {
+        val warehouse = warehouse()
+        val material = material()
+        val project = project()
+        val stockIn = stock(warehouse.id, material.id, StockTransactionType.IN, 10.0)
+            .copy(id = 1, unitPrice = 100, createdAt = now)
+        val projectConsumption = stock(warehouse.id, material.id, StockTransactionType.OUT, 2.0)
+            .copy(id = 2, projectId = project.id, createdAt = now + 1)
+        val snapshot = RestaurantSnapshot(
+            projects = listOf(project),
+            warehouses = listOf(warehouse),
+            materials = listOf(material),
+            mealDeliveries = listOf(meal(project.id, 1_000)),
+            projectPayments = listOf(projectPayment(project.id, 600)),
+            purchases = listOf(purchase(supplierId = 1, total = 1_000, paymentType = PurchasePaymentType.CASH)),
+            expenses = listOf(expense(amount = 50, cardId = 1)),
+            stockTransactions = listOf(stockIn, projectConsumption)
+        )
+        val inventory = InventoryUseCase(FakeRepository(snapshot))
+        val accounting = AccountingUseCase(inventory)
+
+        val summary = accounting.summary(snapshot)
+        val projectProfit = accounting.projectProfits(snapshot).single()
+
+        assertEquals(1_000, summary.earnedRevenue)
+        assertEquals(200, summary.costOfGoodsConsumed)
+        assertEquals(750, summary.netProfit)
+        assertEquals(-450, summary.netCashFlow)
+        assertEquals(800, projectProfit.grossProfit)
     }
 
     @Test
@@ -201,7 +259,8 @@ class UseCaseCalculationTest {
             repository,
             ProjectFinanceUseCase(repository),
             SupplierDebtUseCase(repository),
-            InventoryUseCase(repository)
+            InventoryUseCase(repository),
+            AccountingUseCase(InventoryUseCase(repository))
         )
 
         val csv = reports.expensesCsv(snapshot)
@@ -219,7 +278,7 @@ class UseCaseCalculationTest {
             .copy(id = 1, purchaseId = 1, reason = StockReason.PURCHASE)
         val consumed = stock(warehouse.id, material.id, StockTransactionType.OUT, 8.0)
             .copy(id = 2)
-        val reducedPurchaseIn = originalPurchaseIn.copy(id = 3, quantity = 5.0)
+        val reducedPurchaseIn = originalPurchaseIn.copy(id = 0, quantity = 5.0)
         val snapshot = RestaurantSnapshot(
             warehouses = listOf(warehouse),
             materials = listOf(material),
@@ -239,7 +298,7 @@ class UseCaseCalculationTest {
             .copy(id = 1, purchaseId = 1, reason = StockReason.PURCHASE)
         val consumed = stock(warehouse.id, material.id, StockTransactionType.OUT, 3.0)
             .copy(id = 2)
-        val reducedPurchaseIn = originalPurchaseIn.copy(id = 3, quantity = 5.0)
+        val reducedPurchaseIn = originalPurchaseIn.copy(id = 0, quantity = 5.0)
         val snapshot = RestaurantSnapshot(
             warehouses = listOf(warehouse),
             materials = listOf(material),

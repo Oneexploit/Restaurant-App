@@ -150,6 +150,8 @@ fun PurchasesListScreen(
                 } else {
                     firstMaterial?.name ?: "کالای نامشخص"
                 }
+                val allocatedPayments = state.snapshot.supplierPayments.filter { it.purchaseId == purchase.id }.sumOf { it.amount }
+                val remainingAmount = (purchase.totalAmount - purchase.paidAmount - allocatedPayments).coerceAtLeast(0)
                 GlassCard(Modifier.fillMaxWidth(), accent = if (purchase.paymentType == PurchasePaymentType.CREDIT) AppOrange else AppGreen) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(firstMaterial?.imageEmoji ?: "🧾", style = MaterialTheme.typography.headlineMedium)
@@ -158,6 +160,9 @@ fun PurchasesListScreen(
                             Text(itemsTitle, color = TextSecondary)
                             Text("${warehouse?.name.orEmpty()} • ${NumberFormatter.format(purchaseItems.size)} آیتم", color = TextMuted)
                             PersianDateText(purchase.date)
+                            if (remainingAmount > 0) {
+                                Text("مانده: ${MoneyFormatter.format(remainingAmount)}", color = AppOrange)
+                            }
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             StatusChip(purchase.paymentType.label(), if (purchase.paymentType == PurchasePaymentType.CREDIT) AppOrange else AppGreen)

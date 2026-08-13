@@ -55,6 +55,7 @@ data class InventoryItem(
     val unit: UnitType,
     val quantity: Double,
     val approximateValue: Long,
+    val averageUnitCost: Long = 0,
     val minimumStock: Double,
     val isLowStock: Boolean,
     val emoji: String?
@@ -85,6 +86,27 @@ data class MonthlyPoint(
     val income: Long,
     val expense: Long,
     val purchases: Long
+)
+
+data class AccountingSummary(
+    val earnedRevenue: Long = 0,
+    val cashReceived: Long = 0,
+    val cashPaidForPurchases: Long = 0,
+    val cashPaidToSuppliers: Long = 0,
+    val operatingExpenses: Long = 0,
+    val costOfGoodsConsumed: Long = 0,
+    val wasteLoss: Long = 0,
+    val grossProfit: Long = 0,
+    val netProfit: Long = 0,
+    val netCashFlow: Long = 0
+)
+
+data class ProjectProfit(
+    val project: ProjectEntity,
+    val earnedRevenue: Long,
+    val materialCost: Long,
+    val grossProfit: Long,
+    val marginPercent: Double
 )
 
 data class ProjectInput(
@@ -163,6 +185,7 @@ data class SupplierPaymentInput(
     val id: Long = 0,
     val supplierId: Long,
     val bankCardId: Long?,
+    val purchaseId: Long? = null,
     val amount: Long,
     val date: Long,
     val method: PaymentMethod,

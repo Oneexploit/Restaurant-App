@@ -38,18 +38,20 @@ Run unit tests:
 - Starts with an empty local database so operators create their own warehouses, materials, suppliers, cards, and projects.
 - Project receivable calculation from Room data.
 - Supplier debt calculation from credit purchases and supplier payments.
-- Inventory calculation from stock transactions.
+- Moving weighted-average inventory valuation with invoice-discount allocation.
+- Accrual profit and loss, cash-flow, waste loss, and project profitability analysis.
+- Optional supplier-payment allocation to individual credit invoices.
 - Bank card balance calculation from initial balance, received project payments, card purchases, supplier payments, and expenses.
 - Multi-item daily purchase invoices with automatic stock-in transactions.
 - Edit support for meal deliveries, purchase invoices, project receipts, supplier payments, and expenses.
 - Stock in, stock out, transfer, waste, and adjustment forms.
-- Local CSV export for purchases, inventory, receivables, supplier debts, and payments.
+- Local CSV export for purchases, inventory, receivables, supplier debts, payments, profit/loss, project profit, and cash flow.
 - Local JSON backup and guarded restore for all Room tables, including structure validation and an automatic pre-restore backup.
 - DataStore setting for local low-stock warning visibility.
 
 ## Database Overview
 
-Room database version: `2`
+Room database version: `3`
 
 Main tables:
 

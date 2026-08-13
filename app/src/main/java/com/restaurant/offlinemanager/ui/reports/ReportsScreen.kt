@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Business
+import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Inventory
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.ShoppingCart
@@ -64,6 +65,7 @@ fun ReportsScreen(
     modifier: Modifier = Modifier
 ) {
     val bestProject = state.projectFinances.maxByOrNull { it.totalDelivered }
+    val mostProfitableProject = state.projectProfits.firstOrNull { it.earnedRevenue > 0 }
     val topDebtorProject = state.projectFinances.filter { it.receivable > 0 }.maxByOrNull { it.receivable }
     val topSupplierDebt = state.supplierDebts.filter { it.remaining > 0 }.maxByOrNull { it.remaining }
     val lowStock = state.inventory.filter { it.isLowStock }.take(3)
@@ -85,6 +87,25 @@ fun ReportsScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 StatCard("مطالبات", MoneyFormatter.format(state.dashboard.projectReceivablesTotal), Icons.AutoMirrored.Outlined.ReceiptLong, AppOrange, Modifier.weight(1f))
                 StatCard("بدهی تامین‌کننده", MoneyFormatter.format(state.dashboard.supplierDebtsTotal), Icons.Outlined.Payments, AppRed, Modifier.weight(1f))
+            }
+        }
+        item { SectionHeader("عملکرد مالی واقعی") }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatCard("درآمد تحقق‌یافته", MoneyFormatter.format(state.accounting.earnedRevenue), Icons.Outlined.Payments, AppGreen, Modifier.weight(1f))
+                StatCard("بهای مواد مصرفی", MoneyFormatter.format(state.accounting.costOfGoodsConsumed), Icons.Outlined.Inventory, AppOrange, Modifier.weight(1f))
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatCard("سود ناخالص", MoneyFormatter.format(state.accounting.grossProfit), Icons.Outlined.BarChart, Gold, Modifier.weight(1f))
+                StatCard("سود خالص", MoneyFormatter.format(state.accounting.netProfit), Icons.Outlined.BarChart, if (state.accounting.netProfit >= 0) AppGreen else AppRed, Modifier.weight(1f))
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatCard("جریان نقد خالص", MoneyFormatter.format(state.accounting.netCashFlow), Icons.Outlined.Payments, if (state.accounting.netCashFlow >= 0) AppCyan else AppRed, Modifier.weight(1f))
+                StatCard("زیان ضایعات", MoneyFormatter.format(state.accounting.wasteLoss), Icons.Outlined.Warning, AppRed, Modifier.weight(1f))
             }
         }
         item {
@@ -118,6 +139,16 @@ fun ReportsScreen(
         }
         item {
             ReportCard(
+                title = "سودآورترین پروژه",
+                subtitle = mostProfitableProject?.let {
+                    "${it.project.name} • سود ${MoneyFormatter.format(it.grossProfit)} • حاشیه ${NumberFormatter.format(it.marginPercent)}٪"
+                } ?: "برای محاسبه سود پروژه، خروج مواد را به پروژه مربوط متصل کنید.",
+                icon = Icons.Outlined.BarChart,
+                accent = AppGreen
+            )
+        }
+        item {
+            ReportCard(
                 title = "بدهکارترین پروژه",
                 subtitle = topDebtorProject?.let { "${it.project.name} • ${MoneyFormatter.format(it.receivable.coerceAtLeast(0))}" } ?: "مطالبه فعالی وجود ندارد.",
                 icon = Icons.AutoMirrored.Outlined.ReceiptLong,
@@ -146,6 +177,9 @@ fun ReportsScreen(
         item { GoldPrimaryButton("خروجی بدهی تامین‌کنندگان", onClick = { onExport(context, CsvReportType.SUPPLIER_DEBTS) }, icon = Icons.Outlined.FileDownload) }
         item { GoldPrimaryButton("خروجی پرداخت‌ها", onClick = { onExport(context, CsvReportType.PAYMENTS) }, icon = Icons.Outlined.FileDownload) }
         item { GoldPrimaryButton("خروجی هزینه‌ها", onClick = { onExport(context, CsvReportType.EXPENSES) }, icon = Icons.Outlined.FileDownload) }
+        item { GoldPrimaryButton("خروجی سود و زیان", onClick = { onExport(context, CsvReportType.PROFIT_LOSS) }, icon = Icons.Outlined.FileDownload) }
+        item { GoldPrimaryButton("خروجی سود پروژه‌ها", onClick = { onExport(context, CsvReportType.PROJECT_PROFIT) }, icon = Icons.Outlined.FileDownload) }
+        item { GoldPrimaryButton("خروجی جریان نقدی", onClick = { onExport(context, CsvReportType.CASH_FLOW) }, icon = Icons.Outlined.FileDownload) }
         item { Spacer(Modifier.height(20.dp)) }
     }
 }

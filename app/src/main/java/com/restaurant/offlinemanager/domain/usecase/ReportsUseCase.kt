@@ -14,7 +14,8 @@ class ReportsUseCase(
     private val repository: RestaurantRepository,
     private val projectFinanceUseCase: ProjectFinanceUseCase,
     private val supplierDebtUseCase: SupplierDebtUseCase,
-    private val inventoryUseCase: InventoryUseCase
+    private val inventoryUseCase: InventoryUseCase,
+    private val accountingUseCase: AccountingUseCase
 ) {
     fun observeMonthlySummary(): Flow<List<MonthlyPoint>> =
         repository.observeSnapshot().map(::monthlySummary)
@@ -85,6 +86,43 @@ class ReportsUseCase(
         }
     }
 
+    fun profitLossCsv(snapshot: RestaurantSnapshot): String = buildString {
+        val summary = accountingUseCase.summary(snapshot)
+        appendLine(csvRow("metric", "amount"))
+        appendLine(csvRow("earned_revenue", summary.earnedRevenue))
+        appendLine(csvRow("cost_of_goods_consumed", summary.costOfGoodsConsumed))
+        appendLine(csvRow("gross_profit", summary.grossProfit))
+        appendLine(csvRow("operating_expenses", summary.operatingExpenses))
+        appendLine(csvRow("waste_loss", summary.wasteLoss))
+        appendLine(csvRow("net_profit", summary.netProfit))
+    }
+
+    fun projectProfitCsv(snapshot: RestaurantSnapshot): String = buildString {
+        appendLine(csvRow("project", "earned_revenue", "material_cost", "gross_profit", "margin_percent"))
+        accountingUseCase.projectProfits(snapshot).forEach { profit ->
+            appendLine(csvRow(profit.project.name, profit.earnedRevenue, profit.materialCost, profit.grossProfit, profit.marginPercent))
+        }
+    }
+
+    fun cashFlowCsv(snapshot: RestaurantSnapshot): String = buildString {
+        appendLine(csvRow("date", "kind", "description", "inflow", "outflow"))
+        val rows = buildList {
+            snapshot.projectPayments.forEach { payment ->
+                add(CashFlowRow(payment.date, "project_payment", snapshot.projects.firstOrNull { it.id == payment.projectId }?.name.orEmpty(), payment.amount, 0))
+            }
+            snapshot.purchases.filter { it.paidAmount > 0 }.forEach { purchase ->
+                add(CashFlowRow(purchase.date, "purchase", purchase.invoiceNumber.orEmpty(), 0, purchase.paidAmount))
+            }
+            snapshot.supplierPayments.forEach { payment ->
+                add(CashFlowRow(payment.date, "supplier_payment", snapshot.suppliers.firstOrNull { it.id == payment.supplierId }?.name.orEmpty(), 0, payment.amount))
+            }
+            snapshot.expenses.forEach { expense ->
+                add(CashFlowRow(expense.date, "expense", expense.title, 0, expense.amount))
+            }
+        }.sortedBy { it.date }
+        rows.forEach { appendLine(csvRow(PersianDateFormatter.format(it.date), it.kind, it.description, it.inflow, it.outflow)) }
+    }
+
     fun humanSummary(snapshot: RestaurantSnapshot): List<Pair<String, String>> =
         listOf(
             "ارزش انبار" to MoneyFormatter.format(inventoryUseCase.calculateInventory(snapshot).sumOf { it.approximateValue }),
@@ -100,4 +138,6 @@ class ReportsUseCase(
         val escaped = value.replace("\"", "\"\"")
         return if (mustQuote) "\"$escaped\"" else escaped
     }
+
+    private data class CashFlowRow(val date: Long, val kind: String, val description: String, val inflow: Long, val outflow: Long)
 }

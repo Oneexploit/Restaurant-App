@@ -8,6 +8,7 @@ import com.restaurant.offlinemanager.data.local.AppDatabase
 import com.restaurant.offlinemanager.data.repository.AppSettingsRepository
 import com.restaurant.offlinemanager.data.repository.RoomRestaurantRepository
 import com.restaurant.offlinemanager.domain.usecase.AppUseCases
+import com.restaurant.offlinemanager.domain.usecase.AccountingUseCase
 import com.restaurant.offlinemanager.domain.usecase.BankCardBalanceUseCase
 import com.restaurant.offlinemanager.domain.usecase.DashboardUseCase
 import com.restaurant.offlinemanager.domain.usecase.InventoryUseCase
@@ -51,9 +52,16 @@ class AppContainer(private val app: Application) {
         }
     }
 
+    private val migration2To3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE supplier_payments ADD COLUMN purchaseId INTEGER")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_supplier_payments_purchaseId ON supplier_payments(purchaseId)")
+        }
+    }
+
     val database: AppDatabase by lazy {
         Room.databaseBuilder(app, AppDatabase::class.java, "restaurant_offline_manager.db")
-            .addMigrations(migration1To2)
+            .addMigrations(migration1To2, migration2To3)
             .build()
     }
 
@@ -70,13 +78,15 @@ class AppContainer(private val app: Application) {
         val supplierDebt = SupplierDebtUseCase(repository)
         val inventory = InventoryUseCase(repository)
         val bankCards = BankCardBalanceUseCase(repository)
+        val accounting = AccountingUseCase(inventory)
         val dashboard = DashboardUseCase(repository, projectFinance, supplierDebt, inventory, bankCards)
-        val reports = ReportsUseCase(repository, projectFinance, supplierDebt, inventory)
+        val reports = ReportsUseCase(repository, projectFinance, supplierDebt, inventory, accounting)
         AppUseCases(
             inventory = inventory,
             projectFinance = projectFinance,
             supplierDebt = supplierDebt,
             bankCards = bankCards,
+            accounting = accounting,
             dashboard = dashboard,
             reports = reports
         )

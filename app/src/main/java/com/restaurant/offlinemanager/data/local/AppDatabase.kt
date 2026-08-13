@@ -32,7 +32,7 @@ import com.restaurant.offlinemanager.data.local.entity.WarehouseEntity
         SupplierPaymentEntity::class,
         ExpenseEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(DatabaseConverters::class)
