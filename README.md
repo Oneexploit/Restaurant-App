@@ -32,6 +32,24 @@ Run unit tests:
 .\gradlew.bat testDebugUnitTest
 ```
 
+## Release updates
+
+Build and send only the signed release APK:
+
+```bash
+JAVA_HOME=/path/to/android-studio/jbr bash gradlew clean assembleRelease
+```
+
+For every new release:
+
+1. Keep `applicationId` unchanged (`com.restaurant.offlinemanager`).
+2. Increase `versionCode` to a number greater than every APK previously distributed.
+3. Set a user-facing `versionName`.
+4. Sign with the same `release-key.jks` and key alias.
+5. Send `app/build/outputs/apk/release/app-release.apk`; never send the Debug APK.
+
+Back up `release-key.jks` and its passwords securely. Losing this signing key makes future in-place updates impossible. Installing a correctly signed APK with a higher `versionCode` updates the existing app while Room migrations preserve its local data.
+
 ## Features
 
 - Dark premium dashboard with glass cards and gold accents.
@@ -51,7 +69,7 @@ Run unit tests:
 
 ## Database Overview
 
-Room database version: `3`
+Room database version: `4`
 
 Main tables:
 
