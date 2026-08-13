@@ -75,7 +75,6 @@ fun HomeScreen(
     onAddPayment: () -> Unit,
     onReports: () -> Unit,
     onAddWarehouse: () -> Unit,
-    onAddMaterialCategory: () -> Unit,
     onAddMaterial: () -> Unit,
     onAddSupplier: () -> Unit,
     onAddBankCard: () -> Unit,
@@ -96,7 +95,6 @@ fun HomeScreen(
         state = state,
         onAddProject = onAddProject,
         onAddWarehouse = onAddWarehouse,
-        onAddMaterialCategory = onAddMaterialCategory,
         onAddMaterial = onAddMaterial,
         onAddSupplier = onAddSupplier,
         onAddBankCard = onAddBankCard
@@ -328,7 +326,6 @@ private fun rememberSetupSteps(
     state: AppUiState,
     onAddProject: () -> Unit,
     onAddWarehouse: () -> Unit,
-    onAddMaterialCategory: () -> Unit,
     onAddMaterial: () -> Unit,
     onAddSupplier: () -> Unit,
     onAddBankCard: () -> Unit
@@ -337,9 +334,6 @@ private fun rememberSetupSteps(
         buildList {
             if (state.snapshot.warehouses.isEmpty()) {
                 add(SetupStep("ساخت اولین انبار", "برای خرید و موجودی لازم است.", Icons.Outlined.Inventory, AppGreen, onAddWarehouse))
-            }
-            if (state.snapshot.materialCategories.isEmpty()) {
-                add(SetupStep("ساخت دسته‌بندی مواد", "دسته‌بندی‌ها را خودتان تعریف کنید.", Icons.Outlined.Add, AppCyan, onAddMaterialCategory))
             }
             if (state.snapshot.materials.isEmpty()) {
                 add(SetupStep("ثبت اولین متریال", "مواد اولیه و اقلام مصرفی را وارد کنید.", Icons.Outlined.Restaurant, Gold, onAddMaterial))

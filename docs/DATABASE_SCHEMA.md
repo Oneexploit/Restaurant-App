@@ -2,7 +2,7 @@
 
 Room database: `AppDatabase`
 
-Version: `1`
+Version: `2`
 
 All money values are stored as `Long` in تومان. Quantities are stored as `Double`. Dates are stored as epoch milliseconds.
 
@@ -30,13 +30,9 @@ Fields: `id`, `name`, `type`, `address`, `notes`, `isActive`, `createdAt`, `upda
 
 Type enum: `GENERAL`, `COLD_STORAGE`, `FREEZER`, `DRY`.
 
-### material_categories
-
-Fields: `id`, `name`, `iconName`, `createdAt`, `updatedAt`.
-
 ### materials
 
-Fields: `id`, `name`, `categoryId`, `mainUnit`, `minimumStock`, `imageEmoji`, `notes`, `isActive`, `createdAt`, `updatedAt`.
+Fields: `id`, `name`, `mainUnit`, `minimumStock`, `imageEmoji`, `notes`, `isActive`, `createdAt`, `updatedAt`.
 
 Unit enum: `KG`, `GRAM`, `LITER`, `NUMBER`, `CARTON`, `PACKAGE`.
 

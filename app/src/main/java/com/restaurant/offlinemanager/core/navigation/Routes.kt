@@ -18,7 +18,6 @@ object Routes {
     const val AddEditMealDelivery = "addEditMealDelivery"
     const val WarehousesList = "warehouse"
     const val AddEditWarehouse = "addEditWarehouse"
-    const val AddMaterialCategory = "addMaterialCategory"
     const val AddEditMaterial = "addEditMaterial"
     const val AddStockIn = "addStockIn"
     const val AddStockOut = "addStockOut"

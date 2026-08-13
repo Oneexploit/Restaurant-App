@@ -62,7 +62,6 @@ import com.restaurant.offlinemanager.core.design.TextSecondary
 import com.restaurant.offlinemanager.core.utils.MoneyFormatter
 import com.restaurant.offlinemanager.core.utils.NumberFormatter
 import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
-import com.restaurant.offlinemanager.data.local.entity.MaterialCategoryEntity
 import com.restaurant.offlinemanager.data.local.entity.MaterialEntity
 import com.restaurant.offlinemanager.data.local.entity.StockReason
 import com.restaurant.offlinemanager.data.local.entity.StockTransactionType
@@ -85,19 +84,16 @@ fun WarehouseMainScreen(
     onWaste: () -> Unit,
     onAdjustment: () -> Unit,
     onAddWarehouse: () -> Unit,
-    onAddMaterialCategory: () -> Unit,
     onAddMaterial: () -> Unit,
     onEditWarehouse: (Long) -> Unit,
-    onEditMaterialCategory: (Long) -> Unit,
     onEditMaterial: (Long) -> Unit,
     onDeleteWarehouse: (Long) -> Unit,
-    onDeleteMaterialCategory: (Long) -> Unit,
     onDeleteMaterial: (Long) -> Unit,
     onDeleteStockTransaction: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var tab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("موجودی کالا", "انبارها", "تراکنش‌ها", "متریال‌ها", "دسته‌بندی‌ها")
+    val tabs = listOf("موجودی کالا", "انبارها", "تراکنش‌ها", "متریال‌ها")
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -109,8 +105,7 @@ fun WarehouseMainScreen(
             0 -> InventoryTab(state, onStockIn, onStockOut, onTransfer, onWaste, onAdjustment)
             1 -> WarehousesTab(state, onAddWarehouse, onEditWarehouse, onDeleteWarehouse)
             2 -> TransactionsTab(state, onDeleteStockTransaction)
-            3 -> MaterialsTab(state, onAddMaterial, onAddMaterialCategory, onEditMaterial, onDeleteMaterial)
-            4 -> CategoriesTab(state, onAddMaterialCategory, onEditMaterialCategory, onDeleteMaterialCategory)
+            3 -> MaterialsTab(state, onAddMaterial, onEditMaterial, onDeleteMaterial)
         }
     }
 }
@@ -361,23 +356,18 @@ private fun TransactionsTab(state: AppUiState, onDeleteStockTransaction: (Long) 
 private fun MaterialsTab(
     state: AppUiState,
     onAddMaterial: () -> Unit,
-    onAddCategory: () -> Unit,
     onEditMaterial: (Long) -> Unit,
     onDeleteMaterial: (Long) -> Unit
 ) {
     var deleteId by remember { mutableStateOf<Long?>(null) }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                GoldPrimaryButton("افزودن متریال", onClick = onAddMaterial, icon = Icons.Outlined.Add, modifier = Modifier.weight(1f))
-                GoldPrimaryButton("دسته‌بندی", onClick = onAddCategory, icon = Icons.Outlined.Add, modifier = Modifier.weight(1f))
-            }
+            GoldPrimaryButton("افزودن متریال", onClick = onAddMaterial, icon = Icons.Outlined.Add)
         }
         if (state.snapshot.materials.isEmpty()) {
             item { EmptyState("متریالی ثبت نشده", "مواد اولیه و اقلام مصرفی را برای استفاده در خرید و انبار اضافه کنید.") }
         } else {
             items(state.snapshot.materials, key = { it.id }) { material ->
-                val category = state.snapshot.materialCategories.firstOrNull { it.id == material.categoryId }
                 GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(material.imageEmoji ?: "•", style = MaterialTheme.typography.headlineMedium)
@@ -385,7 +375,6 @@ private fun MaterialsTab(
                             Text(material.name, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
                             Text("واحد اصلی: ${material.mainUnit.label()}", color = TextSecondary)
                             Text("حداقل موجودی: ${NumberFormatter.format(material.minimumStock)}", color = TextSecondary)
-                            Text("دسته‌بندی: ${category?.name ?: "بدون دسته"}", color = TextMuted)
                         }
                         StatusChip(if (material.isActive) "فعال" else "غیرفعال", if (material.isActive) AppGreen else TextMuted)
                     }
@@ -612,7 +601,6 @@ fun MaterialFormScreen(
     state: AppUiState,
     materialId: Long?,
     onSave: (MaterialEntity) -> Unit,
-    onAddCategory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val editing = state.snapshot.materials.firstOrNull { it.id == materialId }
@@ -622,12 +610,6 @@ fun MaterialFormScreen(
     var emoji by remember(editing?.id) { mutableStateOf(editing?.imageEmoji ?: "🍽") }
     var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
     var isActive by remember(editing?.id) { mutableStateOf(editing?.isActive ?: true) }
-    var category by remember(editing?.id, state.snapshot.materialCategories) {
-        mutableStateOf(
-            state.snapshot.materialCategories.firstOrNull { it.id == editing?.categoryId }
-                ?: state.snapshot.materialCategories.firstOrNull()
-        )
-    }
     var error by remember { mutableStateOf<String?>(null) }
     val now = PersianDateFormatter.nowMillis()
     LazyColumn(
@@ -640,10 +622,6 @@ fun MaterialFormScreen(
         item {
             GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
                 DarkOutlinedTextField(name, { name = it }, "نام متریال")
-                Spacer(Modifier.height(10.dp))
-                OptionSelector("دسته‌بندی", state.snapshot.materialCategories, category, { it.name }) { category = it }
-                Spacer(Modifier.height(8.dp))
-                SecondaryGlassButton("افزودن دسته‌بندی", onClick = onAddCategory, icon = Icons.Outlined.Add, accent = AppCyan)
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OptionSelector("واحد", UnitType.entries, unit, { it.label() }, modifier = Modifier.weight(1f)) { unit = it }
@@ -669,7 +647,6 @@ fun MaterialFormScreen(
                 val minimum = NumberFormatter.normalizeDigits(minStock).toDoubleOrNull() ?: 0.0
                 error = when {
                     name.isBlank() -> "نام متریال الزامی است"
-                    category == null -> "دسته‌بندی متریال را انتخاب کنید"
                     minimum < 0.0 -> "حداقل موجودی نمی‌تواند منفی باشد"
                     else -> null
                 }
@@ -678,7 +655,6 @@ fun MaterialFormScreen(
                         MaterialEntity(
                             id = editing?.id ?: 0,
                             name = name,
-                            categoryId = category?.id,
                             mainUnit = unit,
                             minimumStock = minimum,
                             imageEmoji = emoji,
@@ -691,104 +667,6 @@ fun MaterialFormScreen(
                 }
             }, icon = Icons.Outlined.Save)
         }
-    }
-}
-
-@Composable
-private fun CategoriesTab(
-    state: AppUiState,
-    onAddCategory: () -> Unit,
-    onEditCategory: (Long) -> Unit,
-    onDeleteCategory: (Long) -> Unit
-) {
-    var deleteId by remember { mutableStateOf<Long?>(null) }
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { GoldPrimaryButton("افزودن دسته‌بندی", onClick = onAddCategory, icon = Icons.Outlined.Add) }
-        if (state.snapshot.materialCategories.isEmpty()) {
-            item { EmptyState("دسته‌بندی ثبت نشده", "قبل از ثبت متریال، دسته‌بندی‌های دلخواه خودتان را بسازید.") }
-        } else {
-            items(state.snapshot.materialCategories, key = { it.id }) { category ->
-                val count = state.snapshot.materials.count { it.categoryId == category.id }
-                GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(category.iconName ?: "•", style = MaterialTheme.typography.headlineMedium)
-                        Column(Modifier.weight(1f)) {
-                            Text(category.name, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
-                            Text("${NumberFormatter.format(count)} متریال در این دسته", color = TextSecondary)
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SecondaryGlassButton("ویرایش", onClick = { onEditCategory(category.id) }, icon = Icons.Outlined.Save, accent = AppCyan, modifier = Modifier.weight(1f))
-                        DangerButton("حذف", onClick = { deleteId = category.id }, modifier = Modifier.weight(1f))
-                    }
-                }
-            }
-        }
-    }
-    deleteId?.let { id ->
-        ConfirmDialog(
-            title = "حذف دسته‌بندی",
-            message = "متریال‌های داخل این دسته‌بندی حذف نمی‌شوند و فقط بدون دسته‌بندی می‌مانند.",
-            confirmText = "حذف",
-            onConfirm = {
-                deleteId = null
-                onDeleteCategory(id)
-            },
-            onDismiss = { deleteId = null }
-        )
-    }
-}
-
-@Composable
-fun MaterialCategoryFormScreen(
-    state: AppUiState,
-    categoryId: Long?,
-    onSave: (MaterialCategoryEntity) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val editing = state.snapshot.materialCategories.firstOrNull { it.id == categoryId }
-    var name by remember(editing?.id) { mutableStateOf(editing?.name.orEmpty()) }
-    var icon by remember(editing?.id) { mutableStateOf(editing?.iconName.orEmpty()) }
-    var error by remember { mutableStateOf<String?>(null) }
-    val now = PersianDateFormatter.nowMillis()
-
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item { SectionHeader(if (editing == null) "افزودن دسته‌بندی" else "ویرایش دسته‌بندی") }
-        item {
-            GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
-                DarkOutlinedTextField(name, { name = it }, "نام دسته‌بندی")
-                Spacer(Modifier.height(10.dp))
-                DarkOutlinedTextField(icon, { icon = it }, "آیکن/ایموجی اختیاری")
-            }
-        }
-        if (error != null) item { Text(error.orEmpty(), color = AppRed) }
-        item {
-            FormActionFooter(
-                text = "ذخیره دسته‌بندی",
-                icon = Icons.Outlined.Save,
-                onClick = {
-                    error = if (name.isBlank()) "نام دسته‌بندی الزامی است" else null
-                    if (error == null) {
-                        onSave(
-                            MaterialCategoryEntity(
-                                id = editing?.id ?: 0,
-                                name = name,
-                                iconName = icon.ifBlank { null },
-                                createdAt = editing?.createdAt ?: now,
-                                updatedAt = now
-                            )
-                        )
-                    }
-                }
-            )
-        }
-        item { Spacer(Modifier.height(20.dp)) }
     }
 }
 

@@ -35,7 +35,7 @@ Run unit tests:
 ## Features
 
 - Dark premium dashboard with glass cards and gold accents.
-- Starts with an empty local database so operators create their own warehouses, categories, materials, suppliers, cards, and projects.
+- Starts with an empty local database so operators create their own warehouses, materials, suppliers, cards, and projects.
 - Project receivable calculation from Room data.
 - Supplier debt calculation from credit purchases and supplier payments.
 - Inventory calculation from stock transactions.
@@ -49,14 +49,13 @@ Run unit tests:
 
 ## Database Overview
 
-Room database version: `1`
+Room database version: `2`
 
 Main tables:
 
 - `projects`
 - `meal_deliveries`
 - `warehouses`
-- `material_categories`
 - `materials`
 - `suppliers`
 - `stock_transactions`

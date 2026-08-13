@@ -9,7 +9,6 @@ import com.restaurant.offlinemanager.data.local.dao.RestaurantDao
 import com.restaurant.offlinemanager.data.local.entity.BankCardEntity
 import com.restaurant.offlinemanager.data.local.entity.ExpenseCategory
 import com.restaurant.offlinemanager.data.local.entity.ExpenseEntity
-import com.restaurant.offlinemanager.data.local.entity.MaterialCategoryEntity
 import com.restaurant.offlinemanager.data.local.entity.MaterialEntity
 import com.restaurant.offlinemanager.data.local.entity.MealDeliveryEntity
 import com.restaurant.offlinemanager.data.local.entity.MealType
@@ -59,7 +58,6 @@ class RoomRestaurantRepository(
             dao.observeProjects().map { it as Any },
             dao.observeMealDeliveries().map { it as Any },
             dao.observeWarehouses().map { it as Any },
-            dao.observeMaterialCategories().map { it as Any },
             dao.observeMaterials().map { it as Any },
             dao.observeSuppliers().map { it as Any },
             dao.observeStockTransactions().map { it as Any },
@@ -76,16 +74,15 @@ class RoomRestaurantRepository(
                 projects = values[0] as List<ProjectEntity>,
                 mealDeliveries = values[1] as List<MealDeliveryEntity>,
                 warehouses = values[2] as List<WarehouseEntity>,
-                materialCategories = values[3] as List<MaterialCategoryEntity>,
-                materials = values[4] as List<MaterialEntity>,
-                suppliers = values[5] as List<SupplierEntity>,
-                stockTransactions = values[6] as List<StockTransactionEntity>,
-                purchases = values[7] as List<PurchaseEntity>,
-                purchaseItems = values[8] as List<PurchaseItemEntity>,
-                bankCards = values[9] as List<BankCardEntity>,
-                projectPayments = values[10] as List<ProjectPaymentEntity>,
-                supplierPayments = values[11] as List<SupplierPaymentEntity>,
-                expenses = values[12] as List<ExpenseEntity>
+                materials = values[3] as List<MaterialEntity>,
+                suppliers = values[4] as List<SupplierEntity>,
+                stockTransactions = values[5] as List<StockTransactionEntity>,
+                purchases = values[6] as List<PurchaseEntity>,
+                purchaseItems = values[7] as List<PurchaseItemEntity>,
+                bankCards = values[8] as List<BankCardEntity>,
+                projectPayments = values[9] as List<ProjectPaymentEntity>,
+                supplierPayments = values[10] as List<SupplierPaymentEntity>,
+                expenses = values[11] as List<ExpenseEntity>
             )
         }
     }
@@ -95,7 +92,6 @@ class RoomRestaurantRepository(
             projects = dao.getProjects(),
             mealDeliveries = dao.getMealDeliveries(),
             warehouses = dao.getWarehouses(),
-            materialCategories = dao.getMaterialCategories(),
             materials = dao.getMaterials(),
             suppliers = dao.getSuppliers(),
             stockTransactions = dao.getStockTransactions(),
@@ -167,25 +163,9 @@ class RoomRestaurantRepository(
         )
     }
 
-    override suspend fun saveMaterialCategory(entity: MaterialCategoryEntity): Long {
-        require(entity.name.isNotBlank()) { "نام دسته‌بندی الزامی است" }
-        val now = PersianDateFormatter.nowMillis()
-        return dao.insertMaterialCategory(
-            entity.copy(
-                name = entity.name.trim(),
-                iconName = entity.iconName?.trim()?.ifBlank { null },
-                createdAt = entity.createdAt.takeIf { it > 0 } ?: now,
-                updatedAt = now
-            )
-        )
-    }
-
     override suspend fun saveMaterial(entity: MaterialEntity): Long {
         require(entity.name.isNotBlank()) { "نام متریال الزامی است" }
         require(entity.minimumStock >= 0.0) { "حداقل موجودی نمی‌تواند منفی باشد" }
-        entity.categoryId?.let { categoryId ->
-            require(currentSnapshot().materialCategories.any { it.id == categoryId }) { "دسته‌بندی متریال معتبر نیست" }
-        }
         val now = PersianDateFormatter.nowMillis()
         return dao.insertMaterial(
             entity.copy(
@@ -506,21 +486,6 @@ class RoomRestaurantRepository(
             }
         }
 
-    override suspend fun deleteMaterialCategory(id: Long): Result<Unit> =
-        runCatching {
-            val snapshot = currentSnapshot()
-            snapshot.materialCategories.firstOrNull { it.id == id }
-                ?: error("دسته‌بندی پیدا نشد")
-            database.withTransaction {
-                snapshot.materials
-                    .filter { it.categoryId == id }
-                    .forEach { material ->
-                        dao.insertMaterial(material.copy(categoryId = null, updatedAt = PersianDateFormatter.nowMillis()))
-                    }
-                dao.deleteMaterialCategory(id)
-            }
-        }
-
     override suspend fun deleteMaterial(id: Long): Result<Unit> =
         runCatching {
             val snapshot = currentSnapshot()
@@ -627,7 +592,6 @@ class RoomRestaurantRepository(
             exportBackup(context)
             database.withTransaction {
                 clearAll()
-                dao.insertMaterialCategories(snapshot.materialCategories)
                 dao.insertWarehouses(snapshot.warehouses)
                 dao.insertMaterials(snapshot.materials)
                 dao.insertSuppliers(snapshot.suppliers)
@@ -661,7 +625,6 @@ class RoomRestaurantRepository(
         dao.clearBankCards()
         dao.clearSuppliers()
         dao.clearMaterials()
-        dao.clearMaterialCategories()
         dao.clearWarehouses()
         dao.clearMealDeliveries()
     }
@@ -701,7 +664,7 @@ private fun stockTransactionsReplacingPurchase(
 private object BackupJson {
     fun encode(snapshot: RestaurantSnapshot): String {
         val root = JSONObject()
-        root.put("version", 1)
+        root.put("version", 2)
         root.put("exportedAt", System.currentTimeMillis())
         root.put("projects", snapshot.projects.toJsonArray {
             JSONObject()
@@ -745,19 +708,10 @@ private object BackupJson {
                 .put("createdAt", it.createdAt)
                 .put("updatedAt", it.updatedAt)
         })
-        root.put("materialCategories", snapshot.materialCategories.toJsonArray {
-            JSONObject()
-                .put("id", it.id)
-                .put("name", it.name)
-                .putNullable("iconName", it.iconName)
-                .put("createdAt", it.createdAt)
-                .put("updatedAt", it.updatedAt)
-        })
         root.put("materials", snapshot.materials.toJsonArray {
             JSONObject()
                 .put("id", it.id)
                 .put("name", it.name)
-                .putNullable("categoryId", it.categoryId)
                 .put("mainUnit", it.mainUnit.name)
                 .put("minimumStock", it.minimumStock)
                 .putNullable("imageEmoji", it.imageEmoji)
@@ -878,7 +832,7 @@ private object BackupJson {
 
     fun decode(json: String): RestaurantSnapshot {
         val root = JSONObject(json)
-        require(root.optInt("version", 0) == 1) { "نسخه فایل پشتیبان پشتیبانی نمی‌شود" }
+        require(root.optInt("version", 0) in 1..2) { "نسخه فایل پشتیبان پشتیبانی نمی‌شود" }
         requiredArrays.forEach { name ->
             require(root.optJSONArray(name) != null) { "ساختار فایل پشتیبان ناقص است: $name" }
         }
@@ -908,11 +862,8 @@ private object BackupJson {
             warehouses = root.array("warehouses").mapObjects {
                 WarehouseEntity(getLong("id"), getString("name"), WarehouseType.valueOf(getString("type")), optStringOrNull("address"), optStringOrNull("notes"), getBoolean("isActive"), getLong("createdAt"), getLong("updatedAt"))
             },
-            materialCategories = root.array("materialCategories").mapObjects {
-                MaterialCategoryEntity(getLong("id"), getString("name"), optStringOrNull("iconName"), getLong("createdAt"), getLong("updatedAt"))
-            },
             materials = root.array("materials").mapObjects {
-                MaterialEntity(getLong("id"), getString("name"), optLongOrNull("categoryId"), UnitType.valueOf(getString("mainUnit")), getDouble("minimumStock"), optStringOrNull("imageEmoji"), optStringOrNull("notes"), getBoolean("isActive"), getLong("createdAt"), getLong("updatedAt"))
+                MaterialEntity(getLong("id"), getString("name"), UnitType.valueOf(getString("mainUnit")), getDouble("minimumStock"), optStringOrNull("imageEmoji"), optStringOrNull("notes"), getBoolean("isActive"), getLong("createdAt"), getLong("updatedAt"))
             },
             suppliers = root.array("suppliers").mapObjects {
                 SupplierEntity(getLong("id"), getString("name"), optStringOrNull("phone"), optStringOrNull("address"), optStringOrNull("notes"), getBoolean("isActive"), getLong("createdAt"), getLong("updatedAt"))
@@ -944,7 +895,6 @@ private object BackupJson {
     fun validate(snapshot: RestaurantSnapshot) {
         val projectIds = snapshot.projects.map { it.id }.toSet()
         val warehouseIds = snapshot.warehouses.map { it.id }.toSet()
-        val categoryIds = snapshot.materialCategories.map { it.id }.toSet()
         val materialIds = snapshot.materials.map { it.id }.toSet()
         val supplierIds = snapshot.suppliers.map { it.id }.toSet()
         val purchaseIds = snapshot.purchases.map { it.id }.toSet()
@@ -956,10 +906,7 @@ private object BackupJson {
         require(snapshot.warehouses.all { it.id > 0 && it.name.isNotBlank() }) {
             "فایل پشتیبان انبار نامعتبر دارد"
         }
-        require(snapshot.materialCategories.all { it.id > 0 && it.name.isNotBlank() }) {
-            "فایل پشتیبان دسته‌بندی نامعتبر دارد"
-        }
-        require(snapshot.materials.all { it.id > 0 && it.name.isNotBlank() && it.minimumStock >= 0 && (it.categoryId == null || it.categoryId in categoryIds) }) {
+        require(snapshot.materials.all { it.id > 0 && it.name.isNotBlank() && it.minimumStock >= 0 }) {
             "فایل پشتیبان متریال نامعتبر دارد"
         }
         require(snapshot.suppliers.all { it.id > 0 && it.name.isNotBlank() }) {
@@ -1037,7 +984,6 @@ private object BackupJson {
         "projects",
         "mealDeliveries",
         "warehouses",
-        "materialCategories",
         "materials",
         "suppliers",
         "stockTransactions",

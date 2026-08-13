@@ -7,7 +7,6 @@ import androidx.room.Query
 import androidx.room.Update
 import com.restaurant.offlinemanager.data.local.entity.BankCardEntity
 import com.restaurant.offlinemanager.data.local.entity.ExpenseEntity
-import com.restaurant.offlinemanager.data.local.entity.MaterialCategoryEntity
 import com.restaurant.offlinemanager.data.local.entity.MaterialEntity
 import com.restaurant.offlinemanager.data.local.entity.MealDeliveryEntity
 import com.restaurant.offlinemanager.data.local.entity.ProjectEntity
@@ -30,9 +29,6 @@ interface RestaurantDao {
 
     @Query("SELECT * FROM warehouses ORDER BY id")
     fun observeWarehouses(): Flow<List<WarehouseEntity>>
-
-    @Query("SELECT * FROM material_categories ORDER BY name")
-    fun observeMaterialCategories(): Flow<List<MaterialCategoryEntity>>
 
     @Query("SELECT * FROM materials ORDER BY name")
     fun observeMaterials(): Flow<List<MaterialEntity>>
@@ -69,9 +65,6 @@ interface RestaurantDao {
 
     @Query("SELECT * FROM warehouses ORDER BY id")
     suspend fun getWarehouses(): List<WarehouseEntity>
-
-    @Query("SELECT * FROM material_categories ORDER BY id")
-    suspend fun getMaterialCategories(): List<MaterialCategoryEntity>
 
     @Query("SELECT * FROM materials ORDER BY id")
     suspend fun getMaterials(): List<MaterialEntity>
@@ -122,9 +115,6 @@ interface RestaurantDao {
     suspend fun insertWarehouse(entity: WarehouseEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertMaterialCategory(entity: MaterialCategoryEntity): Long
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMaterial(entity: MaterialEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -159,9 +149,6 @@ interface RestaurantDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWarehouses(entities: List<WarehouseEntity>)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertMaterialCategories(entities: List<MaterialCategoryEntity>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMaterials(entities: List<MaterialEntity>)
@@ -202,9 +189,6 @@ interface RestaurantDao {
     @Query("DELETE FROM warehouses")
     suspend fun clearWarehouses()
 
-    @Query("DELETE FROM material_categories")
-    suspend fun clearMaterialCategories()
-
     @Query("DELETE FROM materials")
     suspend fun clearMaterials()
 
@@ -234,9 +218,6 @@ interface RestaurantDao {
 
     @Query("DELETE FROM warehouses WHERE id = :id")
     suspend fun deleteWarehouse(id: Long)
-
-    @Query("DELETE FROM material_categories WHERE id = :id")
-    suspend fun deleteMaterialCategory(id: Long)
 
     @Query("DELETE FROM materials WHERE id = :id")
     suspend fun deleteMaterial(id: Long)

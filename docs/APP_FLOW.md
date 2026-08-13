@@ -2,7 +2,7 @@
 
 ## Launch
 
-`RestaurantOfflineApp` creates `AppContainer`, builds Room, and wires repositories/use cases. The app intentionally starts with an empty local database; users create warehouses, categories, materials, suppliers, cards, and projects themselves.
+`RestaurantOfflineApp` creates `AppContainer`, builds Room, and wires repositories/use cases. The app intentionally starts with an empty local database; users create warehouses, materials, suppliers, cards, and projects themselves.
 
 ## Main Navigation
 
@@ -73,3 +73,5 @@ Reports use the same Room snapshot and use cases as the dashboard. CSV files are
 Backup exports all Room tables to a JSON file in the app external files `backups` directory.
 
 Restore validates the selected JSON document, creates an automatic pre-restore backup of current data, clears current tables in a Room transaction, and reinserts preserved IDs where possible.
+
+Backup version 2 no longer stores material categories. Version 1 backups remain restorable; their category data is ignored while all materials are preserved.

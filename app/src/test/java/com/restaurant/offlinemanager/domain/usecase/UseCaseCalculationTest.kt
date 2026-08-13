@@ -5,7 +5,6 @@ import android.net.Uri
 import com.restaurant.offlinemanager.data.local.entity.BankCardEntity
 import com.restaurant.offlinemanager.data.local.entity.ExpenseCategory
 import com.restaurant.offlinemanager.data.local.entity.ExpenseEntity
-import com.restaurant.offlinemanager.data.local.entity.MaterialCategoryEntity
 import com.restaurant.offlinemanager.data.local.entity.MaterialEntity
 import com.restaurant.offlinemanager.data.local.entity.MealDeliveryEntity
 import com.restaurant.offlinemanager.data.local.entity.MealType
@@ -253,7 +252,7 @@ class UseCaseCalculationTest {
         WarehouseEntity(id, "انبار تست", WarehouseType.GENERAL, isActive = true, createdAt = now, updatedAt = now)
 
     private fun material(id: Long = 1): MaterialEntity =
-        MaterialEntity(id, "برنج تست", null, UnitType.KG, minimumStock = 5.0, isActive = true, createdAt = now, updatedAt = now)
+        MaterialEntity(id, "برنج تست", UnitType.KG, minimumStock = 5.0, isActive = true, createdAt = now, updatedAt = now)
 
     private fun stock(warehouseId: Long, materialId: Long, type: StockTransactionType, quantity: Double): StockTransactionEntity =
         StockTransactionEntity(id = quantity.toLong() + type.ordinal, warehouseId = warehouseId, materialId = materialId, type = type, reason = StockReason.MANUAL_ADJUSTMENT, quantity = quantity, unit = UnitType.KG, date = now, createdAt = now, updatedAt = now)
@@ -278,7 +277,6 @@ private class FakeRepository(private val snapshot: RestaurantSnapshot) : Restaur
     override suspend fun archiveProject(projectId: Long): Result<Unit> = unsupported()
     override suspend fun saveMealDelivery(input: MealDeliveryInput): Result<Long> = unsupported()
     override suspend fun saveWarehouse(entity: WarehouseEntity): Long = unsupported()
-    override suspend fun saveMaterialCategory(entity: MaterialCategoryEntity): Long = unsupported()
     override suspend fun saveMaterial(entity: MaterialEntity): Long = unsupported()
     override suspend fun saveSupplier(entity: SupplierEntity): Long = unsupported()
     override suspend fun saveStockTransaction(input: StockTransactionInput): Result<Long> = unsupported()
@@ -290,7 +288,6 @@ private class FakeRepository(private val snapshot: RestaurantSnapshot) : Restaur
     override suspend fun saveExpense(entity: ExpenseEntity): Long = unsupported()
     override suspend fun deleteMealDelivery(id: Long): Result<Unit> = unsupported()
     override suspend fun deleteWarehouse(id: Long): Result<Unit> = unsupported()
-    override suspend fun deleteMaterialCategory(id: Long): Result<Unit> = unsupported()
     override suspend fun deleteMaterial(id: Long): Result<Unit> = unsupported()
     override suspend fun deleteSupplier(id: Long): Result<Unit> = unsupported()
     override suspend fun deleteBankCard(id: Long): Result<Unit> = unsupported()

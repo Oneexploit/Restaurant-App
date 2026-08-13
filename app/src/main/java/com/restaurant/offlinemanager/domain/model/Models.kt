@@ -2,7 +2,6 @@ package com.restaurant.offlinemanager.domain.model
 
 import com.restaurant.offlinemanager.data.local.entity.BankCardEntity
 import com.restaurant.offlinemanager.data.local.entity.ExpenseEntity
-import com.restaurant.offlinemanager.data.local.entity.MaterialCategoryEntity
 import com.restaurant.offlinemanager.data.local.entity.MaterialEntity
 import com.restaurant.offlinemanager.data.local.entity.MealDeliveryEntity
 import com.restaurant.offlinemanager.data.local.entity.PaymentMethod
@@ -23,7 +22,6 @@ data class RestaurantSnapshot(
     val projects: List<ProjectEntity> = emptyList(),
     val mealDeliveries: List<MealDeliveryEntity> = emptyList(),
     val warehouses: List<WarehouseEntity> = emptyList(),
-    val materialCategories: List<MaterialCategoryEntity> = emptyList(),
     val materials: List<MaterialEntity> = emptyList(),
     val suppliers: List<SupplierEntity> = emptyList(),
     val stockTransactions: List<StockTransactionEntity> = emptyList(),

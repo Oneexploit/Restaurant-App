@@ -10,7 +10,6 @@ import androidx.lifecycle.viewModelScope
 import com.restaurant.offlinemanager.core.notifications.AppNotificationScheduler
 import com.restaurant.offlinemanager.data.local.entity.BankCardEntity
 import com.restaurant.offlinemanager.data.local.entity.ExpenseEntity
-import com.restaurant.offlinemanager.data.local.entity.MaterialCategoryEntity
 import com.restaurant.offlinemanager.data.local.entity.MaterialEntity
 import com.restaurant.offlinemanager.data.local.entity.SupplierEntity
 import com.restaurant.offlinemanager.data.local.entity.WarehouseEntity
@@ -123,10 +122,6 @@ class RestaurantViewModel(
         repository.saveWarehouse(entity)
     }
 
-    fun saveMaterialCategory(entity: MaterialCategoryEntity, onSuccess: () -> Unit = {}) = ioAction("دسته‌بندی ذخیره شد", onSuccess) {
-        repository.saveMaterialCategory(entity)
-    }
-
     fun saveMaterial(entity: MaterialEntity, onSuccess: () -> Unit = {}) = ioAction("متریال ذخیره شد", onSuccess) {
         repository.saveMaterial(entity)
     }
@@ -217,10 +212,6 @@ class RestaurantViewModel(
 
     fun deleteWarehouse(id: Long) = ioAction("انبار حذف یا غیرفعال شد") {
         repository.deleteWarehouse(id).getOrThrow()
-    }
-
-    fun deleteMaterialCategory(id: Long) = ioAction("دسته‌بندی حذف شد") {
-        repository.deleteMaterialCategory(id).getOrThrow()
     }
 
     fun deleteMaterial(id: Long) = ioAction("متریال حذف یا غیرفعال شد") {

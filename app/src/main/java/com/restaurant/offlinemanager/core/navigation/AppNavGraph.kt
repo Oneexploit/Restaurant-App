@@ -46,7 +46,6 @@ import com.restaurant.offlinemanager.ui.reports.ReportsScreen
 import com.restaurant.offlinemanager.ui.search.SearchScreen
 import com.restaurant.offlinemanager.ui.settings.SettingsScreen
 import com.restaurant.offlinemanager.ui.warehouse.MaterialFormScreen
-import com.restaurant.offlinemanager.ui.warehouse.MaterialCategoryFormScreen
 import com.restaurant.offlinemanager.ui.warehouse.StockTransactionFormScreen
 import com.restaurant.offlinemanager.ui.warehouse.WarehouseFormScreen
 import com.restaurant.offlinemanager.ui.warehouse.WarehouseMainScreen
@@ -135,7 +134,6 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                     onAddPayment = { navController.navigate("${Routes.AddProjectPayment}/0/0") },
                     onReports = { navController.navigate(Routes.Reports) },
                     onAddWarehouse = { navController.navigate("${Routes.AddEditWarehouse}/0") },
-                    onAddMaterialCategory = { navController.navigate("${Routes.AddMaterialCategory}/0") },
                     onAddMaterial = { navController.navigate("${Routes.AddEditMaterial}/0") },
                     onAddSupplier = { navController.navigate("${Routes.AddSupplier}/0") },
                     onAddBankCard = { navController.navigate("${Routes.AddEditBankCard}/0") }
@@ -203,13 +201,10 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                     onWaste = { navController.navigate(Routes.AddStockWaste) },
                     onAdjustment = { navController.navigate(Routes.AddStockAdjustment) },
                     onAddWarehouse = { navController.navigate("${Routes.AddEditWarehouse}/0") },
-                    onAddMaterialCategory = { navController.navigate("${Routes.AddMaterialCategory}/0") },
                     onAddMaterial = { navController.navigate("${Routes.AddEditMaterial}/0") },
                     onEditWarehouse = { navController.navigate("${Routes.AddEditWarehouse}/$it") },
-                    onEditMaterialCategory = { navController.navigate("${Routes.AddMaterialCategory}/$it") },
                     onEditMaterial = { navController.navigate("${Routes.AddEditMaterial}/$it") },
                     onDeleteWarehouse = viewModel::deleteWarehouse,
-                    onDeleteMaterialCategory = viewModel::deleteMaterialCategory,
                     onDeleteMaterial = viewModel::deleteMaterial,
                     onDeleteStockTransaction = viewModel::deleteStockTransaction
                 )
@@ -249,15 +244,6 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                 })
             }
             composable(
-                route = "${Routes.AddMaterialCategory}/{categoryId}",
-                arguments = listOf(navArgument("categoryId") { type = NavType.LongType })
-            ) { entry ->
-                val categoryId = entry.arguments?.getLong("categoryId")?.takeIf { it != 0L }
-                MaterialCategoryFormScreen(state, categoryId, onSave = {
-                    viewModel.saveMaterialCategory(it) { navController.popBackStack() }
-                })
-            }
-            composable(
                 route = "${Routes.AddEditMaterial}/{materialId}",
                 arguments = listOf(navArgument("materialId") { type = NavType.LongType })
             ) { entry ->
@@ -267,8 +253,7 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                     materialId,
                     onSave = {
                         viewModel.saveMaterial(it) { navController.popBackStack() }
-                    },
-                    onAddCategory = { navController.navigate("${Routes.AddMaterialCategory}/0") }
+                    }
                 )
             }
             composable(Routes.PurchasesList) {
@@ -405,7 +390,7 @@ private fun bottomRouteFor(route: String?): String? =
         route == null -> null
         route.startsWith(Routes.Home) -> Routes.Home
         route.startsWith(Routes.ProjectsList) || route.startsWith(Routes.ProjectDetails) || route.startsWith(Routes.AddEditProject) || route.startsWith(Routes.MealDeliveryList) || route.startsWith(Routes.AddEditMealDelivery) -> Routes.ProjectsList
-        route.startsWith(Routes.WarehousesList) || route.startsWith(Routes.AddStockIn) || route.startsWith(Routes.AddStockOut) || route.startsWith(Routes.TransferStock) || route.startsWith(Routes.AddStockWaste) || route.startsWith(Routes.AddStockAdjustment) || route.startsWith(Routes.AddEditWarehouse) || route.startsWith(Routes.AddMaterialCategory) || route.startsWith(Routes.AddEditMaterial) -> Routes.WarehousesList
+        route.startsWith(Routes.WarehousesList) || route.startsWith(Routes.AddStockIn) || route.startsWith(Routes.AddStockOut) || route.startsWith(Routes.TransferStock) || route.startsWith(Routes.AddStockWaste) || route.startsWith(Routes.AddStockAdjustment) || route.startsWith(Routes.AddEditWarehouse) || route.startsWith(Routes.AddEditMaterial) -> Routes.WarehousesList
         route.startsWith(Routes.FinanceDashboard) || route.startsWith(Routes.AddProjectPayment) || route.startsWith(Routes.AddSupplierPayment) || route.startsWith(Routes.AddEditBankCard) || route.startsWith(Routes.AddExpense) -> Routes.FinanceDashboard
         route.startsWith(Routes.PurchasesList) || route.startsWith(Routes.AddEditPurchase) || route.startsWith(Routes.AddSupplier) -> Routes.PurchasesList
         route.startsWith(Routes.Reports) -> Routes.Reports
@@ -426,7 +411,6 @@ private fun titleFor(route: String?): String =
         route.startsWith(Routes.AddStockWaste) -> "ضایعات کالا"
         route.startsWith(Routes.AddStockAdjustment) -> "اصلاح موجودی"
         route.startsWith(Routes.AddEditWarehouse) -> "فرم انبار"
-        route.startsWith(Routes.AddMaterialCategory) -> "دسته‌بندی کالا"
         route.startsWith(Routes.AddEditMaterial) -> "فرم متریال"
         route.startsWith(Routes.FinanceDashboard) -> "مالی"
         route.startsWith(Routes.AddProjectPayment) -> "دریافت پروژه"
