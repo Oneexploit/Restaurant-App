@@ -129,9 +129,14 @@ data class MealDeliveryInput(
     val id: Long = 0,
     val projectId: Long,
     val date: Long,
+    val deliveryTimeMinutes: Int?,
     val mealType: com.restaurant.offlinemanager.data.local.entity.MealType,
+    val status: com.restaurant.offlinemanager.data.local.entity.DeliveryStatus,
     val quantity: Int,
+    val returnedQuantity: Int,
     val unitPrice: Long,
+    val recipientName: String?,
+    val recipientPhone: String?,
     val notes: String?
 )
 

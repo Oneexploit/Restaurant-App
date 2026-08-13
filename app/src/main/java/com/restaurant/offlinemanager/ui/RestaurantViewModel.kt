@@ -61,6 +61,7 @@ data class AppUiState(
 )
 
 enum class CsvReportType(val filePrefix: String, val successLabel: String) {
+    MEAL_DELIVERIES("meal-deliveries", "گزارش تحویل غذا"),
     PURCHASES("purchases", "گزارش خریدها"),
     INVENTORY("inventory", "گزارش موجودی"),
     RECEIVABLES("project-receivables", "گزارش مطالبات"),
@@ -126,7 +127,7 @@ class RestaurantViewModel(
         repository.archiveProject(projectId).getOrThrow()
     }
 
-    fun saveMealDelivery(input: MealDeliveryInput, onSuccess: () -> Unit = {}) = ioAction("وعده ثبت شد", onSuccess) {
+    fun saveMealDelivery(input: MealDeliveryInput, onSuccess: () -> Unit = {}) = ioAction("تحویل غذا ثبت شد", onSuccess) {
         repository.saveMealDelivery(input).getOrThrow()
     }
 
@@ -206,6 +207,7 @@ class RestaurantViewModel(
     fun exportCsv(context: Context, type: CsvReportType) = ioAction("${type.successLabel} ذخیره شد") {
         val snapshot = repository.currentSnapshot()
         val csv = when (type) {
+            CsvReportType.MEAL_DELIVERIES -> useCases.reports.mealDeliveriesCsv(snapshot)
             CsvReportType.PURCHASES -> useCases.reports.purchasesCsv(snapshot)
             CsvReportType.INVENTORY -> useCases.reports.inventoryCsv(snapshot)
             CsvReportType.RECEIVABLES -> useCases.reports.receivablesCsv(snapshot)
@@ -221,7 +223,7 @@ class RestaurantViewModel(
         shareFile(context, file, "text/csv")
     }
 
-    fun deleteMealDelivery(id: Long) = ioAction("وعده حذف شد") {
+    fun deleteMealDelivery(id: Long) = ioAction("تحویل غذا حذف شد") {
         repository.deleteMealDelivery(id).getOrThrow()
     }
 

@@ -11,6 +11,7 @@ import com.restaurant.offlinemanager.data.local.entity.ExpenseCategory
 import com.restaurant.offlinemanager.data.local.entity.ExpenseEntity
 import com.restaurant.offlinemanager.data.local.entity.MaterialEntity
 import com.restaurant.offlinemanager.data.local.entity.MealDeliveryEntity
+import com.restaurant.offlinemanager.data.local.entity.DeliveryStatus
 import com.restaurant.offlinemanager.data.local.entity.MealType
 import com.restaurant.offlinemanager.data.local.entity.PaymentMethod
 import com.restaurant.offlinemanager.data.local.entity.ProjectEntity
@@ -123,14 +124,19 @@ class RoomRestaurantRepository(
         runCatching {
             require(input.quantity > 0) { "تعداد وعده باید بیشتر از صفر باشد" }
             require(input.unitPrice > 0) { "قیمت واحد باید بیشتر از صفر باشد" }
+            require(input.returnedQuantity in 0..input.quantity) { "تعداد برگشتی باید بین صفر و تعداد ارسالی باشد" }
+            require(input.status != DeliveryStatus.RETURNED || input.returnedQuantity == input.quantity) {
+                "برای وضعیت برگشت کامل، تعداد برگشتی باید برابر تعداد ارسالی باشد"
+            }
+            require(input.deliveryTimeMinutes == null || input.deliveryTimeMinutes in 0..1439) { "زمان تحویل نامعتبر است" }
             val snapshot = currentSnapshot()
             val project = snapshot.projects.firstOrNull { it.id == input.projectId } ?: error("پروژه پیدا نشد")
             val existing = snapshot.mealDeliveries.firstOrNull { it.id == input.id }
             require(project.status == ProjectStatus.ACTIVE || existing?.projectId == input.projectId) {
-                "ثبت وعده فقط برای پروژه فعال مجاز است"
+                "تحویل غذا فقط برای پروژه فعال مجاز است"
             }
             require(snapshot.mealDeliveries.none { it.id != input.id && it.projectId == input.projectId && it.date == input.date && it.mealType == input.mealType }) {
-                "برای این پروژه، تاریخ و نوع وعده قبلا ثبت شده است"
+                "برای این پروژه، تاریخ و نوع غذا قبلاً ثبت شده است؛ همان رکورد را ویرایش کنید"
             }
             val now = PersianDateFormatter.nowMillis()
             dao.insertMealDelivery(
@@ -138,10 +144,17 @@ class RoomRestaurantRepository(
                     id = input.id,
                     projectId = input.projectId,
                     date = input.date,
+                    deliveryTimeMinutes = input.deliveryTimeMinutes,
                     mealType = input.mealType,
+                    status = input.status,
                     quantity = input.quantity,
+                    returnedQuantity = input.returnedQuantity,
                     unitPrice = input.unitPrice,
-                    totalAmount = input.quantity * input.unitPrice,
+                    totalAmount = if (input.status == DeliveryStatus.DELIVERED) {
+                        (input.quantity - input.returnedQuantity) * input.unitPrice
+                    } else 0,
+                    recipientName = input.recipientName?.trim()?.ifBlank { null },
+                    recipientPhone = input.recipientPhone?.trim()?.ifBlank { null },
                     notes = input.notes?.ifBlank { null },
                     createdAt = existing?.createdAt ?: now,
                     updatedAt = now
@@ -692,7 +705,7 @@ private fun stockTransactionsReplacingPurchase(
 private object BackupJson {
     fun encode(snapshot: RestaurantSnapshot): String {
         val root = JSONObject()
-        root.put("version", 3)
+        root.put("version", 4)
         root.put("exportedAt", System.currentTimeMillis())
         root.put("projects", snapshot.projects.toJsonArray {
             JSONObject()
@@ -717,10 +730,15 @@ private object BackupJson {
                 .put("id", it.id)
                 .put("projectId", it.projectId)
                 .put("date", it.date)
+                .putNullable("deliveryTimeMinutes", it.deliveryTimeMinutes)
                 .put("mealType", it.mealType.name)
+                .put("status", it.status.name)
                 .put("quantity", it.quantity)
+                .put("returnedQuantity", it.returnedQuantity)
                 .put("unitPrice", it.unitPrice)
                 .put("totalAmount", it.totalAmount)
+                .putNullable("recipientName", it.recipientName)
+                .putNullable("recipientPhone", it.recipientPhone)
                 .putNullable("notes", it.notes)
                 .put("createdAt", it.createdAt)
                 .put("updatedAt", it.updatedAt)
@@ -861,7 +879,7 @@ private object BackupJson {
 
     fun decode(json: String): RestaurantSnapshot {
         val root = JSONObject(json)
-        require(root.optInt("version", 0) in 1..3) { "نسخه فایل پشتیبان پشتیبانی نمی‌شود" }
+        require(root.optInt("version", 0) in 1..4) { "نسخه فایل پشتیبان پشتیبانی نمی‌شود" }
         requiredArrays.forEach { name ->
             require(root.optJSONArray(name) != null) { "ساختار فایل پشتیبان ناقص است: $name" }
         }
@@ -886,7 +904,23 @@ private object BackupJson {
                 )
             },
             mealDeliveries = root.array("mealDeliveries").mapObjects {
-                MealDeliveryEntity(getLong("id"), getLong("projectId"), getLong("date"), MealType.valueOf(getString("mealType")), getInt("quantity"), getLong("unitPrice"), getLong("totalAmount"), optStringOrNull("notes"), getLong("createdAt"), getLong("updatedAt"))
+                MealDeliveryEntity(
+                    id = getLong("id"),
+                    projectId = getLong("projectId"),
+                    date = getLong("date"),
+                    deliveryTimeMinutes = optIntOrNull("deliveryTimeMinutes"),
+                    mealType = MealType.valueOf(getString("mealType")),
+                    status = optStringOrNull("status")?.let(DeliveryStatus::valueOf) ?: DeliveryStatus.DELIVERED,
+                    quantity = getInt("quantity"),
+                    returnedQuantity = optInt("returnedQuantity", 0),
+                    unitPrice = getLong("unitPrice"),
+                    totalAmount = getLong("totalAmount"),
+                    recipientName = optStringOrNull("recipientName"),
+                    recipientPhone = optStringOrNull("recipientPhone"),
+                    notes = optStringOrNull("notes"),
+                    createdAt = getLong("createdAt"),
+                    updatedAt = getLong("updatedAt")
+                )
             },
             warehouses = root.array("warehouses").mapObjects {
                 WarehouseEntity(getLong("id"), getString("name"), WarehouseType.valueOf(getString("type")), optStringOrNull("address"), optStringOrNull("notes"), getBoolean("isActive"), getLong("createdAt"), getLong("updatedAt"))
@@ -955,11 +989,17 @@ private object BackupJson {
         require(snapshot.bankCards.all { it.id > 0 && it.title.isNotBlank() && it.initialBalance >= 0 }) {
             "فایل پشتیبان کارت بانکی نامعتبر دارد"
         }
-        require(snapshot.mealDeliveries.all { it.projectId in projectIds && it.quantity > 0 && it.unitPrice > 0 && it.totalAmount >= 0 }) {
-            "فایل پشتیبان وعده نامعتبر دارد"
+        require(snapshot.mealDeliveries.all {
+            it.projectId in projectIds && it.quantity > 0 && it.returnedQuantity in 0..it.quantity &&
+                (it.status != DeliveryStatus.RETURNED || it.returnedQuantity == it.quantity) &&
+                it.unitPrice > 0 && it.totalAmount >= 0 && (it.deliveryTimeMinutes == null || it.deliveryTimeMinutes in 0..1439)
+        }) {
+            "فایل پشتیبان تحویل غذای نامعتبر دارد"
         }
-        require(snapshot.mealDeliveries.all { it.totalAmount == it.quantity * it.unitPrice }) {
-            "فایل پشتیبان محاسبه وعده نامعتبر دارد"
+        require(snapshot.mealDeliveries.all {
+            it.totalAmount == if (it.status == DeliveryStatus.DELIVERED) (it.quantity - it.returnedQuantity) * it.unitPrice else 0
+        }) {
+            "فایل پشتیبان محاسبه تحویل غذا نامعتبر دارد"
         }
         require(snapshot.purchases.all { purchase ->
             purchase.id > 0 &&
@@ -1057,4 +1097,7 @@ private object BackupJson {
 
     private fun JSONObject.optLongOrNull(name: String): Long? =
         if (!has(name) || isNull(name)) null else getLong(name)
+
+    private fun JSONObject.optIntOrNull(name: String): Int? =
+        if (!has(name) || isNull(name)) null else getInt(name)
 }

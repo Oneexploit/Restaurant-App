@@ -1,5 +1,7 @@
 package com.restaurant.offlinemanager.domain.usecase
 
+import com.restaurant.offlinemanager.data.local.entity.DeliveryStatus
+import com.restaurant.offlinemanager.data.local.entity.billableQuantity
 import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
 import com.restaurant.offlinemanager.data.local.entity.ProjectStatus
 import com.restaurant.offlinemanager.domain.model.DashboardStats
@@ -27,7 +29,9 @@ class DashboardUseCase(
         val inventory = inventoryUseCase.calculateInventory(snapshot)
         return DashboardStats(
             activeProjectsCount = snapshot.projects.count { it.status == ProjectStatus.ACTIVE },
-            todayMealCount = snapshot.mealDeliveries.filter { isSameDay(it.date, today) }.sumOf { it.quantity },
+            todayMealCount = snapshot.mealDeliveries
+                .filter { it.status == DeliveryStatus.DELIVERED && isSameDay(it.date, today) }
+                .sumOf { it.billableQuantity },
             todayPurchasesTotal = snapshot.purchases.filter { isSameDay(it.date, today) }.sumOf { it.totalAmount },
             projectReceivablesTotal = projectFinanceUseCase.receivableTotal(snapshot),
             supplierDebtsTotal = supplierDebtUseCase.debtTotal(snapshot),

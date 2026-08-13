@@ -58,6 +58,8 @@ import com.restaurant.offlinemanager.core.utils.MoneyFormatter
 import com.restaurant.offlinemanager.core.utils.NumberFormatter
 import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
 import com.restaurant.offlinemanager.data.local.entity.ProjectStatus
+import com.restaurant.offlinemanager.data.local.entity.DeliveryStatus
+import com.restaurant.offlinemanager.data.local.entity.billableQuantity
 import com.restaurant.offlinemanager.domain.model.InventoryItem
 import com.restaurant.offlinemanager.domain.model.label
 import com.restaurant.offlinemanager.ui.AppUiState
@@ -87,7 +89,7 @@ fun HomeScreen(
         .filter { it.project.status == ProjectStatus.ACTIVE }
         .take(3)
     val todayMeals = state.snapshot.mealDeliveries
-        .filter { it.date.isSameLocalDay(today) }
+        .filter { it.status == DeliveryStatus.DELIVERED && it.date.isSameLocalDay(today) }
         .take(3)
     val lowStock = if (lowStockAlertsEnabled) state.inventory.filter { it.isLowStock }.take(4) else emptyList()
     val setupSteps = rememberSetupSteps(
@@ -144,7 +146,7 @@ fun HomeScreen(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ActionCard("ثبت وعده", Icons.Outlined.Restaurant, AppCyan, onAddMeal, Modifier.weight(1f))
+                    ActionCard("تحویل غذا", Icons.Outlined.Restaurant, AppCyan, onAddMeal, Modifier.weight(1f))
                     ActionCard("خرید روزانه", Icons.Outlined.ShoppingCart, Gold, onAddPurchase, Modifier.weight(1f))
                     ActionCard("ورود کالا", Icons.Outlined.Inventory, AppGreen, onStockIn, Modifier.weight(1f))
                 }
@@ -181,10 +183,10 @@ fun HomeScreen(
             }
         }
         item {
-            SectionHeader("وعده‌های امروز")
+            SectionHeader("تحویل‌های امروز")
         }
         if (todayMeals.isEmpty()) {
-            item { EmptyState("وعده‌ای برای امروز ثبت نشده", "ثبت وعده امروز، آمار داشبورد را به‌روز می‌کند.") }
+            item { EmptyState("غذایی امروز تحویل نشده", "تحویل نهایی غذا، آمار و مطالبات را به‌روز می‌کند.") }
         } else {
             items(todayMeals, key = { it.id }) { meal ->
                 val project = state.snapshot.projects.firstOrNull { it.id == meal.projectId }
@@ -193,7 +195,7 @@ fun HomeScreen(
                         Icon(Icons.Outlined.Restaurant, contentDescription = null, tint = AppCyan)
                         Column(modifier = Modifier.weight(1f)) {
                             Text(project?.name ?: "پروژه", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
-                            Text("${meal.mealType.label()} • ${NumberFormatter.format(meal.quantity)} نفر", color = TextSecondary)
+                            Text("${meal.mealType.label()} • ${NumberFormatter.format(meal.billableQuantity)} نفر تحویل نهایی", color = TextSecondary)
                         }
                         MoneyText(meal.totalAmount, style = MaterialTheme.typography.titleMedium)
                     }
@@ -334,7 +336,7 @@ private fun rememberSetupSteps(
                 add(SetupStep("ثبت کارت بانکی", "برای پرداخت‌ها و دریافت‌های غیرنقدی لازم است.", Icons.Outlined.AccountBalanceWallet, AppPurple, onAddBankCard))
             }
             if (state.snapshot.projects.isEmpty()) {
-                add(SetupStep("ثبت اولین پروژه", "بعد از پروژه می‌توانید وعده و دریافت ثبت کنید.", Icons.Outlined.BusinessCenter, AppGreen, onAddProject))
+                add(SetupStep("ثبت اولین پروژه", "بعد از پروژه می‌توانید تحویل غذا و دریافت ثبت کنید.", Icons.Outlined.BusinessCenter, AppGreen, onAddProject))
             }
         }
     }
@@ -365,7 +367,7 @@ private fun GoldPrimaryDashboardHint(onAddProject: () -> Unit) {
             Icon(Icons.Outlined.BusinessCenter, contentDescription = null, tint = Gold)
             Column(modifier = Modifier.weight(1f)) {
                 Text("شروع پروژه جدید", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
-                Text("برای قراردادهای جدید، پروژه را ثبت کنید و سپس وعده‌ها و دریافت‌ها را به آن وصل کنید.", color = TextSecondary)
+                Text("برای قراردادهای جدید، پروژه را ثبت کنید و سپس تحویل‌های غذا و دریافت‌ها را به آن وصل کنید.", color = TextSecondary)
             }
             StatusChip("یک‌بار", Gold)
         }

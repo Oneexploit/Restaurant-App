@@ -2,6 +2,7 @@ package com.restaurant.offlinemanager.data.local
 
 import androidx.room.TypeConverter
 import com.restaurant.offlinemanager.data.local.entity.ExpenseCategory
+import com.restaurant.offlinemanager.data.local.entity.DeliveryStatus
 import com.restaurant.offlinemanager.data.local.entity.MealType
 import com.restaurant.offlinemanager.data.local.entity.PaymentMethod
 import com.restaurant.offlinemanager.data.local.entity.ProjectStatus
@@ -17,6 +18,9 @@ class DatabaseConverters {
 
     @TypeConverter fun toMealType(value: String): MealType = MealType.valueOf(value)
     @TypeConverter fun fromMealType(value: MealType): String = value.name
+
+    @TypeConverter fun toDeliveryStatus(value: String): DeliveryStatus = DeliveryStatus.valueOf(value)
+    @TypeConverter fun fromDeliveryStatus(value: DeliveryStatus): String = value.name
 
     @TypeConverter fun toWarehouseType(value: String): WarehouseType = WarehouseType.valueOf(value)
     @TypeConverter fun fromWarehouseType(value: WarehouseType): String = value.name

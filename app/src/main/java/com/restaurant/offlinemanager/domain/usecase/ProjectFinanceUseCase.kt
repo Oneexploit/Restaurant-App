@@ -1,5 +1,7 @@
 package com.restaurant.offlinemanager.domain.usecase
 
+import com.restaurant.offlinemanager.data.local.entity.DeliveryStatus
+import com.restaurant.offlinemanager.data.local.entity.billableQuantity
 import com.restaurant.offlinemanager.domain.model.ProjectFinance
 import com.restaurant.offlinemanager.domain.model.RestaurantSnapshot
 import com.restaurant.offlinemanager.domain.repository.RestaurantRepository
@@ -12,7 +14,9 @@ class ProjectFinanceUseCase(private val repository: RestaurantRepository) {
 
     fun calculateProjectFinances(snapshot: RestaurantSnapshot): List<ProjectFinance> =
         snapshot.projects.map { project ->
-            val deliveries = snapshot.mealDeliveries.filter { it.projectId == project.id }
+            val deliveries = snapshot.mealDeliveries.filter {
+                it.projectId == project.id && it.status == DeliveryStatus.DELIVERED
+            }
             val delivered = deliveries.sumOf { it.totalAmount }
             val paid = snapshot.projectPayments.filter { it.projectId == project.id }.sumOf { it.amount }
             ProjectFinance(
@@ -20,7 +24,7 @@ class ProjectFinanceUseCase(private val repository: RestaurantRepository) {
                 totalDelivered = delivered,
                 totalPaid = paid,
                 receivable = delivered - paid,
-                totalMeals = deliveries.sumOf { it.quantity }
+                totalMeals = deliveries.sumOf { it.billableQuantity }
             )
         }.sortedByDescending { it.receivable }
 

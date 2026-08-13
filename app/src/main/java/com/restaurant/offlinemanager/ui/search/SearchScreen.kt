@@ -77,11 +77,14 @@ fun SearchScreen(
                 val project = state.snapshot.projects.firstOrNull { it.id == delivery.projectId }
                 project?.name.orEmpty().matchesSearch() ||
                     delivery.mealType.label().matchesSearch() ||
+                    delivery.status.label().matchesSearch() ||
+                    delivery.recipientName.orEmpty().matchesSearch() ||
+                    delivery.recipientPhone.orEmpty().matchesSearch() ||
                     PersianDateFormatter.format(delivery.date).matchesSearch() ||
                     delivery.totalAmount.matchesSearch()
             }.forEach {
                 val project = state.snapshot.projects.firstOrNull { p -> p.id == it.projectId }?.name.orEmpty()
-                add(SearchResultUi("meal-${it.id}", it.id, project, "${it.mealType.label()} • ${MoneyFormatter.format(it.totalAmount)}", "وعده"))
+                add(SearchResultUi("meal-${it.id}", it.id, project, "${it.mealType.label()} • ${it.status.label()} • ${MoneyFormatter.format(it.totalAmount)}", "تحویل غذا"))
             }
             state.snapshot.stockTransactions.filter { tx ->
                 val material = state.snapshot.materials.firstOrNull { it.id == tx.materialId }

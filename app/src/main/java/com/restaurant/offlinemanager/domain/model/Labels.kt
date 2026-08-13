@@ -1,6 +1,7 @@
 package com.restaurant.offlinemanager.domain.model
 
 import com.restaurant.offlinemanager.data.local.entity.ExpenseCategory
+import com.restaurant.offlinemanager.data.local.entity.DeliveryStatus
 import com.restaurant.offlinemanager.data.local.entity.MealType
 import com.restaurant.offlinemanager.data.local.entity.PaymentMethod
 import com.restaurant.offlinemanager.data.local.entity.ProjectStatus
@@ -21,6 +22,14 @@ fun MealType.label(): String = when (this) {
     MealType.BREAKFAST -> "صبحانه"
     MealType.LUNCH -> "ناهار"
     MealType.DINNER -> "شام"
+}
+
+fun DeliveryStatus.label(): String = when (this) {
+    DeliveryStatus.PREPARING -> "در حال آماده‌سازی"
+    DeliveryStatus.DISPATCHED -> "ارسال‌شده"
+    DeliveryStatus.DELIVERED -> "تحویل‌شده"
+    DeliveryStatus.RETURNED -> "برگشت کامل"
+    DeliveryStatus.CANCELLED -> "لغوشده"
 }
 
 fun WarehouseType.label(): String = when (this) {

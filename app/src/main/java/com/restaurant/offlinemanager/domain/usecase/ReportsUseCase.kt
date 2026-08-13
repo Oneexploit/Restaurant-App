@@ -45,6 +45,20 @@ class ReportsUseCase(
         }
     }
 
+    fun mealDeliveriesCsv(snapshot: RestaurantSnapshot): String = buildString {
+        appendLine(csvRow("date", "time", "project", "meal", "status", "sent", "returned", "billable", "unit_price", "total", "recipient", "phone", "notes"))
+        snapshot.mealDeliveries.forEach { delivery ->
+            val project = snapshot.projects.firstOrNull { it.id == delivery.projectId }?.name.orEmpty()
+            val time = delivery.deliveryTimeMinutes?.let { "%02d:%02d".format(it / 60, it % 60) }.orEmpty()
+            appendLine(csvRow(
+                PersianDateFormatter.format(delivery.date), time, project, delivery.mealType.label(), delivery.status.label(),
+                delivery.quantity, delivery.returnedQuantity,
+                if (delivery.status == com.restaurant.offlinemanager.data.local.entity.DeliveryStatus.DELIVERED) delivery.quantity - delivery.returnedQuantity else 0,
+                delivery.unitPrice, delivery.totalAmount, delivery.recipientName, delivery.recipientPhone, delivery.notes
+            ))
+        }
+    }
+
     fun inventoryCsv(snapshot: RestaurantSnapshot): String = buildString {
         appendLine(csvRow("warehouse", "material", "quantity", "unit", "value", "status"))
         inventoryUseCase.calculateInventory(snapshot).forEach { item ->

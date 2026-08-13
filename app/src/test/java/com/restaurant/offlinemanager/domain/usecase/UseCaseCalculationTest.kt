@@ -5,6 +5,7 @@ import android.net.Uri
 import com.restaurant.offlinemanager.data.local.entity.BankCardEntity
 import com.restaurant.offlinemanager.data.local.entity.ExpenseCategory
 import com.restaurant.offlinemanager.data.local.entity.ExpenseEntity
+import com.restaurant.offlinemanager.data.local.entity.DeliveryStatus
 import com.restaurant.offlinemanager.data.local.entity.MaterialEntity
 import com.restaurant.offlinemanager.data.local.entity.MealDeliveryEntity
 import com.restaurant.offlinemanager.data.local.entity.MealType
@@ -57,6 +58,33 @@ class UseCaseCalculationTest {
         assertEquals(3_000, result.totalDelivered)
         assertEquals(750, result.totalPaid)
         assertEquals(2_250, result.receivable)
+    }
+
+    @Test
+    fun projectFinanceCountsOnlyFinalDeliveryAndSubtractsReturns() {
+        val project = project()
+        val delivered = MealDeliveryEntity(
+            id = 1,
+            projectId = project.id,
+            date = now,
+            mealType = MealType.LUNCH,
+            status = DeliveryStatus.DELIVERED,
+            quantity = 10,
+            returnedQuantity = 2,
+            unitPrice = 100,
+            totalAmount = 800,
+            createdAt = now,
+            updatedAt = now
+        )
+        val dispatched = delivered.copy(id = 2, status = DeliveryStatus.DISPATCHED, returnedQuantity = 0, totalAmount = 0)
+        val cancelled = delivered.copy(id = 3, status = DeliveryStatus.CANCELLED, returnedQuantity = 0, totalAmount = 0)
+        val snapshot = RestaurantSnapshot(projects = listOf(project), mealDeliveries = listOf(delivered, dispatched, cancelled))
+
+        val result = ProjectFinanceUseCase(FakeRepository(snapshot)).calculateProjectFinances(snapshot).single()
+
+        assertEquals(8, result.totalMeals)
+        assertEquals(800, result.totalDelivered)
+        assertEquals(800, result.receivable)
     }
 
     @Test

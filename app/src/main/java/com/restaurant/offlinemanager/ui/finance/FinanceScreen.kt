@@ -152,7 +152,7 @@ fun FinanceDashboardScreen(
                 val receivables = state.projectFinances.filter { it.receivable > 0 }
                 item { GoldPrimaryButton("ثبت دریافت", onClick = onAddProjectPayment, icon = Icons.Outlined.Add) }
                 if (receivables.isEmpty()) {
-                    item { EmptyState("مطالبه‌ای وجود ندارد", "پس از ثبت پروژه و وعده، مانده پروژه‌ها اینجا نمایش داده می‌شود.") }
+                    item { EmptyState("مطالبه‌ای وجود ندارد", "پس از تحویل نهایی غذا، مانده پروژه‌ها اینجا نمایش داده می‌شود.") }
                 } else {
                     items(receivables, key = { it.project.id }) { finance ->
                         FinanceRow(
@@ -502,7 +502,7 @@ fun ProjectPaymentFormScreen(
         .map { it.project }
     val cards = state.snapshot.bankCards.filter { it.isActive || it.id == editing?.bankCardId }
     if (projectOptions.isEmpty()) {
-        EmptyPaymentPrerequisite("مطالبه‌ای برای دریافت وجود ندارد", "بعد از ثبت وعده برای پروژه، دریافت قابل ثبت می‌شود.", modifier)
+        EmptyPaymentPrerequisite("مطالبه‌ای برای دریافت وجود ندارد", "بعد از تحویل نهایی غذا برای پروژه، دریافت قابل ثبت می‌شود.", modifier)
         return
     }
     var project by remember(editing?.id, projectOptions) { mutableStateOf(projectOptions.firstOrNull { it.id == editing?.projectId } ?: projectOptions.firstOrNull { it.id == preselectedProjectId } ?: projectOptions.firstOrNull()) }

@@ -7,6 +7,7 @@ import androidx.work.WorkerParameters
 import com.restaurant.offlinemanager.core.utils.MoneyFormatter
 import com.restaurant.offlinemanager.core.utils.NumberFormatter
 import com.restaurant.offlinemanager.data.local.AppDatabase
+import com.restaurant.offlinemanager.data.local.DatabaseMigrations
 import com.restaurant.offlinemanager.data.repository.AppSettingsRepository
 import com.restaurant.offlinemanager.data.repository.RoomRestaurantRepository
 import com.restaurant.offlinemanager.domain.usecase.InventoryUseCase
@@ -27,7 +28,7 @@ class ImportantAlertsWorker(
             applicationContext,
             AppDatabase::class.java,
             "restaurant_offline_manager.db"
-        ).build()
+        ).addMigrations(*DatabaseMigrations.all).build()
 
         return try {
             val repository = RoomRestaurantRepository(database)

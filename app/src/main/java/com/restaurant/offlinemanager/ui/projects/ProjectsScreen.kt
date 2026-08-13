@@ -72,6 +72,7 @@ import com.restaurant.offlinemanager.core.utils.MoneyFormatter
 import com.restaurant.offlinemanager.core.utils.NumberFormatter
 import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
 import com.restaurant.offlinemanager.data.local.entity.ProjectStatus
+import com.restaurant.offlinemanager.data.local.entity.billableQuantity
 import com.restaurant.offlinemanager.domain.model.ProjectFinance
 import com.restaurant.offlinemanager.domain.model.ProjectInput
 import com.restaurant.offlinemanager.domain.model.label
@@ -178,7 +179,7 @@ private fun ProjectCard(
                     valueLabel = if (finance.totalDelivered > 0) {
                         "${NumberFormatter.format((finance.totalPaid * 100.0 / finance.totalDelivered).coerceIn(0.0, 100.0))}٪"
                     } else {
-                        "بدون وعده"
+                        "بدون تحویل"
                     }
                 )
             }
@@ -190,7 +191,7 @@ private fun ProjectCard(
             }
             if (canRegisterMeal) {
                 TextButton(onClick = onAddMeal) {
-                    Text("ثبت وعده", color = AppCyan)
+                    Text("تحویل غذا", color = AppCyan)
                 }
             }
             if (canRegisterPayment) {
@@ -426,7 +427,7 @@ fun ProjectDetailsScreen(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                DetailMetric("کل وعده‌ها", NumberFormatter.format(finance.totalMeals), Modifier.weight(1f))
+                DetailMetric("غذای تحویل‌شده", NumberFormatter.format(finance.totalMeals), Modifier.weight(1f))
                 DetailMetric("کل درآمد", MoneyFormatter.format(finance.totalDelivered), Modifier.weight(1f))
             }
         }
@@ -437,7 +438,7 @@ fun ProjectDetailsScreen(
             }
         }
         if (canRegisterMeal) {
-            item { GoldPrimaryButton(text = "ثبت وعده", icon = Icons.Outlined.Restaurant, onClick = { onAddMeal(projectId) }) }
+            item { GoldPrimaryButton(text = "تحویل غذا", icon = Icons.Outlined.Restaurant, onClick = { onAddMeal(projectId) }) }
         }
         if (canRegisterPayment) {
             item { GoldPrimaryButton(text = "ثبت پرداخت", icon = Icons.Outlined.Payments, onClick = { onAddPayment(projectId) }) }
@@ -446,17 +447,17 @@ fun ProjectDetailsScreen(
         if (finance.project.status != ProjectStatus.ARCHIVED) {
             item { DangerButton(text = "آرشیو پروژه", icon = Icons.Outlined.Archive, onClick = { confirmArchive = true }) }
         }
-        item { SectionHeader("آخرین وعده‌ها") }
+        item { SectionHeader("آخرین تحویل‌های غذا") }
         if (recentMeals.isEmpty()) {
-            item { EmptyState("وعده‌ای برای این پروژه ثبت نشده", "از دکمه ثبت وعده، تحویل‌های پروژه را وارد کنید.") }
+            item { EmptyState("تحویل غذایی برای این پروژه ثبت نشده", "از دکمه تحویل غذا، ارسال‌های پروژه را وارد و پیگیری کنید.") }
         } else {
             items(recentMeals, key = { it.id }) { meal ->
                 GlassCard(Modifier.fillMaxWidth(), accent = AppCyan) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Outlined.Restaurant, contentDescription = null, tint = AppCyan)
                         Column(Modifier.weight(1f)) {
-                            Text(meal.mealType.label(), color = TextPrimary, style = MaterialTheme.typography.titleMedium)
-                            Text("${PersianDateFormatter.format(meal.date)} • ${NumberFormatter.format(meal.quantity)} نفر", color = TextSecondary)
+                            Text("${meal.mealType.label()} • ${meal.status.label()}", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+                            Text("${PersianDateFormatter.format(meal.date)} • ارسالی ${NumberFormatter.format(meal.quantity)} • خالص ${NumberFormatter.format(meal.billableQuantity)}", color = TextSecondary)
                         }
                         MoneyText(meal.totalAmount, style = MaterialTheme.typography.titleMedium)
                     }

@@ -404,7 +404,7 @@ private fun titleFor(route: String?): String =
         route.startsWith(Routes.ProjectsList) -> "پروژه‌ها"
         route.startsWith(Routes.ProjectDetails) -> "جزئیات پروژه"
         route.startsWith(Routes.AddEditProject) -> "فرم پروژه"
-        route.startsWith(Routes.MealDeliveryList) || route.startsWith(Routes.AddEditMealDelivery) -> "ثبت وعده"
+        route.startsWith(Routes.MealDeliveryList) || route.startsWith(Routes.AddEditMealDelivery) -> "تحویل غذا"
         route.startsWith(Routes.WarehousesList) -> "انبار"
         route.startsWith(Routes.AddStockIn) -> "ورود کالا"
         route.startsWith(Routes.AddStockOut) -> "خروج کالا"

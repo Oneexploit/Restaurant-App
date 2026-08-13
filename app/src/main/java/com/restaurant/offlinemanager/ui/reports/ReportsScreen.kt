@@ -171,6 +171,7 @@ fun ReportsScreen(
                 accent = AppOrange
             )
         }
+        item { GoldPrimaryButton("خروجی تحویل غذا", onClick = { onExport(context, CsvReportType.MEAL_DELIVERIES) }, icon = Icons.Outlined.FileDownload) }
         item { GoldPrimaryButton("خروجی خریدها", onClick = { onExport(context, CsvReportType.PURCHASES) }, icon = Icons.Outlined.FileDownload) }
         item { GoldPrimaryButton("خروجی موجودی", onClick = { onExport(context, CsvReportType.INVENTORY) }, icon = Icons.Outlined.FileDownload) }
         item { GoldPrimaryButton("خروجی مطالبات", onClick = { onExport(context, CsvReportType.RECEIVABLES) }, icon = Icons.Outlined.FileDownload) }
