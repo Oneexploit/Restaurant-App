@@ -509,7 +509,13 @@ fun StockTransactionFormScreen(
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    QuantityField(quantity, { quantity = it }, if (mode == StockTransactionType.ADJUSTMENT) "مقدار اصلاحی (+/-)" else "مقدار", Modifier.weight(1f))
+                    QuantityField(
+                        quantity,
+                        { quantity = it },
+                        if (mode == StockTransactionType.ADJUSTMENT) "مقدار اصلاحی (+/-)" else "مقدار",
+                        Modifier.weight(1f),
+                        allowNegative = mode == StockTransactionType.ADJUSTMENT
+                    )
                     MoneyField(unitPrice, { unitPrice = it }, "قیمت واحد", Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(10.dp))

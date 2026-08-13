@@ -139,8 +139,8 @@ class RoomRestaurantRepository(
                 "برای این پروژه، تاریخ و نوع غذا قبلاً ثبت شده است؛ همان رکورد را ویرایش کنید"
             }
             val now = PersianDateFormatter.nowMillis()
-            dao.insertMealDelivery(
-                MealDeliveryEntity(
+            val billableQuantity = if (input.status == DeliveryStatus.DELIVERED) input.quantity - input.returnedQuantity else 0
+            val candidate = MealDeliveryEntity(
                     id = input.id,
                     projectId = input.projectId,
                     date = input.date,
@@ -150,16 +150,24 @@ class RoomRestaurantRepository(
                     quantity = input.quantity,
                     returnedQuantity = input.returnedQuantity,
                     unitPrice = input.unitPrice,
-                    totalAmount = if (input.status == DeliveryStatus.DELIVERED) {
-                        (input.quantity - input.returnedQuantity) * input.unitPrice
-                    } else 0,
+                    totalAmount = Math.multiplyExact(billableQuantity.toLong(), input.unitPrice),
                     recipientName = input.recipientName?.trim()?.ifBlank { null },
                     recipientPhone = input.recipientPhone?.trim()?.ifBlank { null },
                     notes = input.notes?.ifBlank { null },
                     createdAt = existing?.createdAt ?: now,
                     updatedAt = now
                 )
-            )
+            val prospectiveDeliveries = snapshot.mealDeliveries.filterNot { it.id == input.id } + candidate
+            setOfNotNull(existing?.projectId, input.projectId).forEach { affectedProjectId ->
+                val earned = prospectiveDeliveries
+                    .filter { it.projectId == affectedProjectId && it.status == DeliveryStatus.DELIVERED }
+                    .sumOf { it.totalAmount }
+                val received = snapshot.projectPayments.filter { it.projectId == affectedProjectId }.sumOf { it.amount }
+                require(received <= earned) {
+                    "با این تغییر، دریافتی پروژه از مبلغ تحویل‌های نهایی بیشتر می‌شود"
+                }
+            }
+            dao.insertMealDelivery(candidate)
         }
 
     override suspend fun saveWarehouse(entity: WarehouseEntity): Long {
@@ -178,7 +186,7 @@ class RoomRestaurantRepository(
 
     override suspend fun saveMaterial(entity: MaterialEntity): Long {
         require(entity.name.isNotBlank()) { "نام متریال الزامی است" }
-        require(entity.minimumStock >= 0.0) { "حداقل موجودی نمی‌تواند منفی باشد" }
+        require(entity.minimumStock.isFinite() && entity.minimumStock >= 0.0) { "حداقل موجودی نامعتبر است" }
         val now = PersianDateFormatter.nowMillis()
         return dao.insertMaterial(
             entity.copy(
@@ -218,7 +226,7 @@ class RoomRestaurantRepository(
         }
 
     private suspend fun insertStockTransaction(input: StockTransactionInput): Long {
-        require(input.quantity != 0.0) { "مقدار کالا نمی‌تواند صفر باشد" }
+        require(input.quantity.isFinite() && input.quantity != 0.0) { "مقدار کالا نامعتبر است" }
         require(input.type == StockTransactionType.ADJUSTMENT || input.quantity > 0.0) {
             "مقدار منفی فقط برای اصلاح موجودی مجاز است"
         }
@@ -252,8 +260,7 @@ class RoomRestaurantRepository(
             "اصلاح موجودی نمی‌تواند موجودی نهایی را منفی کند"
         }
         val now = PersianDateFormatter.nowMillis()
-        return dao.insertStockTransaction(
-            StockTransactionEntity(
+        val candidate = StockTransactionEntity(
                 warehouseId = input.warehouseId,
                 materialId = input.materialId,
                 projectId = input.projectId,
@@ -269,16 +276,18 @@ class RoomRestaurantRepository(
                 createdAt = now,
                 updatedAt = now
             )
-        )
+        InventoryIntegrityValidator.validateNonNegative(snapshot, snapshot.stockTransactions + candidate)
+        return dao.insertStockTransaction(candidate)
     }
 
     override suspend fun savePurchase(input: PurchaseInput): Result<Long> =
         runCatching {
             require(input.items.isNotEmpty()) { "فاکتور باید حداقل یک آیتم داشته باشد" }
             require(input.discountAmount >= 0) { "تخفیف نمی‌تواند منفی باشد" }
-            require(input.items.all { it.quantity > 0 && it.unitPrice > 0 }) { "مقدار و قیمت همه آیتم‌ها باید مثبت باشد" }
+            require(input.items.all { it.quantity.isFinite() && it.quantity > 0 && it.unitPrice > 0 }) { "مقدار و قیمت همه آیتم‌ها باید معتبر و مثبت باشد" }
             val subtotal = input.items.sumOf { it.totalAmount }
             require(input.discountAmount <= subtotal) { "تخفیف نمی‌تواند بیشتر از جمع آیتم‌ها باشد" }
+            val total = subtotal - input.discountAmount
             val snapshot = currentSnapshot()
             val existing = snapshot.purchases.firstOrNull { it.id == input.id }
             val existingItemMaterialIds = if (existing == null) {
@@ -290,6 +299,15 @@ class RoomRestaurantRepository(
                 snapshot.stockTransactions.filter { it.purchaseId == purchase.id }.minOfOrNull { it.createdAt }
             }
             require(input.id == 0L || existing != null) { "فاکتور خرید برای ویرایش پیدا نشد" }
+            val linkedPayments = snapshot.supplierPayments.filter { it.purchaseId == input.id && input.id != 0L }
+            if (linkedPayments.isNotEmpty()) {
+                require(input.paymentType == PurchasePaymentType.CREDIT && input.supplierId == existing?.supplierId) {
+                    "فاکتور دارای پرداخت متصل است؛ نوع پرداخت یا تامین‌کننده آن قابل تغییر نیست"
+                }
+                require(linkedPayments.sumOf { it.amount } <= total) {
+                    "مبلغ جدید فاکتور از پرداخت‌های ثبت‌شده برای آن کمتر است"
+                }
+            }
             require(snapshot.warehouses.any { it.id == input.warehouseId && (it.isActive || it.id == existing?.warehouseId) }) {
                 "انبار مقصد معتبر نیست"
             }
@@ -313,6 +331,15 @@ class RoomRestaurantRepository(
             require(normalizedInvoice == null || snapshot.purchases.none { it.id != input.id && it.supplierId == input.supplierId && it.invoiceNumber == normalizedInvoice }) {
                 "شماره فاکتور برای این تامین‌کننده قبلا ثبت شده است"
             }
+            setOfNotNull(existing?.supplierId, input.supplierId).forEach { affectedSupplierId ->
+                val prospectiveCredit = snapshot.purchases
+                    .filter { it.id != input.id && it.supplierId == affectedSupplierId && it.paymentType == PurchasePaymentType.CREDIT }
+                    .sumOf { it.totalAmount } + if (input.supplierId == affectedSupplierId && input.paymentType == PurchasePaymentType.CREDIT) total else 0L
+                val supplierPaid = snapshot.supplierPayments.filter { it.supplierId == affectedSupplierId }.sumOf { it.amount }
+                require(supplierPaid <= prospectiveCredit) {
+                    "با این تغییر، پرداخت تامین‌کننده از بدهی نسیه بیشتر می‌شود"
+                }
+            }
             if (input.id != 0L) {
                 InventoryIntegrityValidator.validateNonNegative(
                     snapshot = snapshot,
@@ -321,7 +348,6 @@ class RoomRestaurantRepository(
             }
             database.withTransaction {
                 val now = PersianDateFormatter.nowMillis()
-                val total = subtotal - input.discountAmount
                 val paid = if (input.paymentType == PurchasePaymentType.CREDIT) 0 else total
                 if (input.id != 0L) {
                     dao.deleteStockTransactionsForPurchase(input.id)
@@ -506,6 +532,15 @@ class RoomRestaurantRepository(
 
     override suspend fun deleteMealDelivery(id: Long): Result<Unit> =
         runCatching {
+            val snapshot = currentSnapshot()
+            val delivery = snapshot.mealDeliveries.firstOrNull { it.id == id } ?: error("تحویل غذا پیدا نشد")
+            val remainingRevenue = snapshot.mealDeliveries
+                .filter { it.id != id && it.projectId == delivery.projectId && it.status == DeliveryStatus.DELIVERED }
+                .sumOf { it.totalAmount }
+            val received = snapshot.projectPayments.filter { it.projectId == delivery.projectId }.sumOf { it.amount }
+            require(received <= remainingRevenue) {
+                "این تحویل دارای اثر مالی وصول‌شده است؛ ابتدا دریافت‌های پروژه را اصلاح کنید"
+            }
             dao.deleteMealDelivery(id)
         }
 
@@ -584,8 +619,20 @@ class RoomRestaurantRepository(
 
     override suspend fun deletePurchase(id: Long): Result<Unit> =
         runCatching {
-            dao.getPurchase(id) ?: error("فاکتور خرید پیدا نشد")
+            val purchase = dao.getPurchase(id) ?: error("فاکتور خرید پیدا نشد")
             val snapshot = currentSnapshot()
+            require(snapshot.supplierPayments.none { it.purchaseId == id }) {
+                "برای این فاکتور پرداخت ثبت شده است؛ ابتدا پرداخت متصل را حذف یا اصلاح کنید"
+            }
+            purchase.supplierId?.let { supplierId ->
+                val remainingCredit = snapshot.purchases
+                    .filter { it.id != id && it.supplierId == supplierId && it.paymentType == PurchasePaymentType.CREDIT }
+                    .sumOf { it.totalAmount }
+                val supplierPaid = snapshot.supplierPayments.filter { it.supplierId == supplierId }.sumOf { it.amount }
+                require(supplierPaid <= remainingCredit) {
+                    "حذف این فاکتور، پرداخت تامین‌کننده را بیشتر از بدهی باقی‌مانده می‌کند"
+                }
+            }
             InventoryIntegrityValidator.validateNonNegative(
                 snapshot = snapshot,
                 transactions = snapshot.stockTransactions.filterNot { it.purchaseId == id }
@@ -980,7 +1027,7 @@ private object BackupJson {
         require(snapshot.warehouses.all { it.id > 0 && it.name.isNotBlank() }) {
             "فایل پشتیبان انبار نامعتبر دارد"
         }
-        require(snapshot.materials.all { it.id > 0 && it.name.isNotBlank() && it.minimumStock >= 0 }) {
+        require(snapshot.materials.all { it.id > 0 && it.name.isNotBlank() && it.minimumStock.isFinite() && it.minimumStock >= 0 }) {
             "فایل پشتیبان متریال نامعتبر دارد"
         }
         require(snapshot.suppliers.all { it.id > 0 && it.name.isNotBlank() }) {
@@ -997,7 +1044,9 @@ private object BackupJson {
             "فایل پشتیبان تحویل غذای نامعتبر دارد"
         }
         require(snapshot.mealDeliveries.all {
-            it.totalAmount == if (it.status == DeliveryStatus.DELIVERED) (it.quantity - it.returnedQuantity) * it.unitPrice else 0
+            it.totalAmount == if (it.status == DeliveryStatus.DELIVERED) {
+                Math.multiplyExact((it.quantity - it.returnedQuantity).toLong(), it.unitPrice)
+            } else 0
         }) {
             "فایل پشتیبان محاسبه تحویل غذا نامعتبر دارد"
         }
@@ -1016,7 +1065,7 @@ private object BackupJson {
             "فایل پشتیبان فاکتور خرید نامعتبر دارد"
         }
         require(snapshot.purchaseItems.all {
-            it.purchaseId in purchaseIds && it.materialId in materialIds && it.quantity > 0 && it.unitPrice > 0 && it.totalAmount >= 0
+            it.purchaseId in purchaseIds && it.materialId in materialIds && it.quantity.isFinite() && it.quantity > 0 && it.unitPrice > 0 && it.totalAmount >= 0
         }) {
             "فایل پشتیبان آیتم خرید نامعتبر دارد"
         }
@@ -1033,7 +1082,7 @@ private object BackupJson {
                 (it.projectId == null || it.projectId in projectIds) &&
                 (it.supplierId == null || it.supplierId in supplierIds) &&
                 (it.purchaseId == null || it.purchaseId in purchaseIds) &&
-                it.quantity != 0.0
+                it.quantity.isFinite() && it.quantity != 0.0
         }) {
             "فایل پشتیبان تراکنش انبار نامعتبر دارد"
         }
@@ -1061,6 +1110,30 @@ private object BackupJson {
             (it.bankCardId == null || it.bankCardId in bankCardIds) && it.title.isNotBlank() && it.amount > 0
         }) {
             "فایل پشتیبان هزینه نامعتبر دارد"
+        }
+        val earnedByProject = snapshot.mealDeliveries
+            .filter { it.status == DeliveryStatus.DELIVERED }
+            .groupBy { it.projectId }
+            .mapValues { (_, rows) -> rows.sumOf { it.totalAmount } }
+        require(snapshot.projectPayments.groupBy { it.projectId }.all { (projectId, rows) ->
+            rows.sumOf { it.amount } <= (earnedByProject[projectId] ?: 0L)
+        }) {
+            "فایل پشتیبان برای یک پروژه دریافتی بیشتر از درآمد دارد"
+        }
+        val creditBySupplier = snapshot.purchases
+            .filter { it.paymentType == PurchasePaymentType.CREDIT && it.supplierId != null }
+            .groupBy { it.supplierId!! }
+            .mapValues { (_, rows) -> rows.sumOf { it.totalAmount } }
+        require(snapshot.supplierPayments.groupBy { it.supplierId }.all { (supplierId, rows) ->
+            rows.sumOf { it.amount } <= (creditBySupplier[supplierId] ?: 0L)
+        }) {
+            "فایل پشتیبان برای یک تامین‌کننده پرداخت بیشتر از بدهی دارد"
+        }
+        require(snapshot.supplierPayments.filter { it.purchaseId != null }.groupBy { it.purchaseId!! }.all { (purchaseId, rows) ->
+            val purchase = snapshot.purchases.first { it.id == purchaseId }
+            purchase.paymentType == PurchasePaymentType.CREDIT && rows.sumOf { it.amount } <= purchase.totalAmount
+        }) {
+            "فایل پشتیبان تخصیص پرداخت نامعتبر دارد"
         }
     }
 

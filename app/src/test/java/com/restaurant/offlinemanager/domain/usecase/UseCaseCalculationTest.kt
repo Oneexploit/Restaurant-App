@@ -27,6 +27,7 @@ import com.restaurant.offlinemanager.data.local.entity.WarehouseType
 import com.restaurant.offlinemanager.domain.model.MealDeliveryInput
 import com.restaurant.offlinemanager.domain.model.ProjectInput
 import com.restaurant.offlinemanager.domain.model.ProjectPaymentInput
+import com.restaurant.offlinemanager.domain.model.PurchaseItemInput
 import com.restaurant.offlinemanager.domain.model.PurchaseInput
 import com.restaurant.offlinemanager.domain.model.RestaurantSnapshot
 import com.restaurant.offlinemanager.domain.model.StockTransactionInput
@@ -353,6 +354,30 @@ class UseCaseCalculationTest {
         assertThrows(IllegalArgumentException::class.java) {
             InventoryIntegrityValidator.validateNonNegative(snapshot, listOf(consumed))
         }
+    }
+
+    @Test
+    fun inventoryIntegrityRejectsBackdatedTransactionThatBreaksLaterBalance() {
+        val warehouse = warehouse()
+        val material = material()
+        val incoming = stock(warehouse.id, material.id, StockTransactionType.IN, 5.0)
+            .copy(id = 1, date = now, createdAt = now)
+        val consumed = stock(warehouse.id, material.id, StockTransactionType.OUT, 5.0)
+            .copy(id = 2, date = now + 2, createdAt = now + 2)
+        val backdatedWaste = stock(warehouse.id, material.id, StockTransactionType.WASTE, 1.0)
+            .copy(id = 3, date = now + 1, createdAt = now + 3)
+        val snapshot = RestaurantSnapshot(warehouses = listOf(warehouse), materials = listOf(material))
+
+        assertThrows(IllegalArgumentException::class.java) {
+            InventoryIntegrityValidator.validateNonNegative(snapshot, listOf(incoming, consumed, backdatedWaste))
+        }
+    }
+
+    @Test
+    fun purchaseItemRejectsNonFiniteQuantity() {
+        val item = PurchaseItemInput(materialId = 1, quantity = Double.POSITIVE_INFINITY, unit = UnitType.KG, unitPrice = 100)
+
+        assertThrows(IllegalArgumentException::class.java) { item.totalAmount }
     }
 
     private fun project(id: Long = 1): ProjectEntity =

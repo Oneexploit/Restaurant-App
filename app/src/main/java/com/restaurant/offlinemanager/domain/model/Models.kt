@@ -160,7 +160,13 @@ data class PurchaseItemInput(
     val unit: UnitType,
     val unitPrice: Long
 ) {
-    val totalAmount: Long get() = (quantity * unitPrice).toLong()
+    val totalAmount: Long
+        get() {
+            require(quantity.isFinite() && quantity > 0.0) { "مقدار آیتم خرید نامعتبر است" }
+            val result = quantity * unitPrice.toDouble()
+            require(result.isFinite() && result <= Long.MAX_VALUE) { "مبلغ آیتم خرید بیش از حد مجاز است" }
+            return result.toLong()
+        }
 }
 
 data class PurchaseInput(

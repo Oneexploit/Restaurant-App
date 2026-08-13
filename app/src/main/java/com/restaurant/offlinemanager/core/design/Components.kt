@@ -1481,9 +1481,10 @@ fun QuantityField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    allowNegative: Boolean = false
 ) {
-    QuantityInputField(value = value, onValueChange = onValueChange, label = label, modifier = modifier)
+    QuantityInputField(value = value, onValueChange = onValueChange, label = label, modifier = modifier, allowNegative = allowNegative)
 }
 
 @Composable
@@ -1491,14 +1492,15 @@ fun QuantityInputField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    allowNegative: Boolean = false
 ) {
     DarkOutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         label = label,
         modifier = modifier,
-        keyboardType = KeyboardType.Decimal
+        keyboardType = if (allowNegative) KeyboardType.Text else KeyboardType.Decimal
     )
 }
 
