@@ -145,12 +145,17 @@ fun PurchasesListScreen(
                 val warehouse = state.snapshot.warehouses.firstOrNull { it.id == purchase.warehouseId }
                 val purchaseItems = state.snapshot.purchaseItems.filter { it.purchaseId == purchase.id }
                 val firstMaterial = state.snapshot.materials.firstOrNull { material -> purchaseItems.firstOrNull()?.materialId == material.id }
+                val itemsTitle = if (purchaseItems.size > 1) {
+                    "${NumberFormatter.format(purchaseItems.size)} قلم کالا"
+                } else {
+                    firstMaterial?.name ?: "کالای نامشخص"
+                }
                 GlassCard(Modifier.fillMaxWidth(), accent = if (purchase.paymentType == PurchasePaymentType.CREDIT) AppOrange else AppGreen) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(firstMaterial?.imageEmoji ?: "🧾", style = MaterialTheme.typography.headlineMedium)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(supplier?.name ?: "بدون تامین‌کننده", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
-                            Text(firstMaterial?.name ?: "چند قلم کالا", color = TextSecondary)
+                            Text(itemsTitle, color = TextSecondary)
                             Text("${warehouse?.name.orEmpty()} • ${NumberFormatter.format(purchaseItems.size)} آیتم", color = TextMuted)
                             PersianDateText(purchase.date)
                         }

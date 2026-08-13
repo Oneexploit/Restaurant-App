@@ -18,4 +18,10 @@ class NumberFormatterTest {
 
         assertEquals(1_234_567L, MoneyFormatter.parse(formatted))
     }
+
+    @Test
+    fun normalizesPersianDecimalAndMinusForQuantities() {
+        assertEquals("12.5", NumberFormatter.normalizeDigits("۱۲٫۵"))
+        assertEquals("-2.5", NumberFormatter.normalizeDigits("−۲٫۵"))
+    }
 }

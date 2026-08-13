@@ -104,6 +104,41 @@ class UseCaseCalculationTest {
     }
 
     @Test
+    fun inventoryIncludesMaterialsWithNoTransactionsAsZeroStock() {
+        val warehouse = warehouse()
+        val material = material()
+        val snapshot = RestaurantSnapshot(
+            warehouses = listOf(warehouse),
+            materials = listOf(material)
+        )
+
+        val result = InventoryUseCase(FakeRepository(snapshot)).calculateInventory(snapshot).single()
+
+        assertEquals(0.0, result.quantity, 0.001)
+        assertEquals(0, result.approximateValue)
+        assertTrue(result.isLowStock)
+    }
+
+    @Test
+    fun inventoryUsesLatestManualTransactionPrice() {
+        val warehouse = warehouse()
+        val material = material()
+        val snapshot = RestaurantSnapshot(
+            warehouses = listOf(warehouse),
+            materials = listOf(material),
+            purchaseItems = listOf(purchaseItem(material.id, unitPrice = 100)),
+            stockTransactions = listOf(
+                stock(warehouse.id, material.id, StockTransactionType.IN, 3.0)
+                    .copy(unitPrice = 250, date = now + 1, updatedAt = now + 1)
+            )
+        )
+
+        val result = InventoryUseCase(FakeRepository(snapshot)).calculateInventory(snapshot).single()
+
+        assertEquals(750, result.approximateValue)
+    }
+
+    @Test
     fun bankCardBalanceCombinesIncomeAndOutflows() {
         val card = bankCard(initial = 1_000)
         val snapshot = RestaurantSnapshot(

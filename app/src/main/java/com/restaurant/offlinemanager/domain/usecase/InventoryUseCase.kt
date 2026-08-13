@@ -11,9 +11,15 @@ class InventoryUseCase(private val repository: RestaurantRepository) {
         repository.observeSnapshot().map(::calculateInventory)
 
     fun calculateInventory(snapshot: RestaurantSnapshot): List<InventoryItem> {
-        val latestPrices = snapshot.purchaseItems
+        val latestPurchasePrices = snapshot.purchaseItems
             .groupBy { it.materialId }
             .mapValues { (_, items) -> items.maxByOrNull { it.createdAt }?.unitPrice ?: 0L }
+        val latestTransactionPrices = snapshot.stockTransactions
+            .filter { it.unitPrice != null && it.unitPrice > 0 }
+            .groupBy { it.materialId }
+            .mapValues { (_, transactions) ->
+                transactions.maxWithOrNull(compareBy({ it.date }, { it.updatedAt }))?.unitPrice ?: 0L
+            }
 
         val grouped = snapshot.stockTransactions.groupBy { it.warehouseId to it.materialId }
         val inventory = mutableListOf<InventoryItem>()
@@ -21,21 +27,21 @@ class InventoryUseCase(private val repository: RestaurantRepository) {
             snapshot.materials.filter { it.isActive }.forEach { material ->
                 val transactions = grouped[warehouse.id to material.id].orEmpty()
                 val quantity = transactions.sumOf(InventoryIntegrityValidator::signedQuantity)
-                if (transactions.isNotEmpty()) {
-                    val unitPrice = latestPrices[material.id] ?: 0L
-                    inventory += InventoryItem(
-                        materialId = material.id,
-                        materialName = material.name,
-                        warehouseId = warehouse.id,
-                        warehouseName = warehouse.name,
-                        unit = material.mainUnit,
-                        quantity = quantity,
-                        approximateValue = (quantity.coerceAtLeast(0.0) * unitPrice).toLong(),
-                        minimumStock = material.minimumStock,
-                        isLowStock = quantity < material.minimumStock,
-                        emoji = material.imageEmoji
-                    )
-                }
+                val unitPrice = latestTransactionPrices[material.id]
+                    ?: latestPurchasePrices[material.id]
+                    ?: 0L
+                inventory += InventoryItem(
+                    materialId = material.id,
+                    materialName = material.name,
+                    warehouseId = warehouse.id,
+                    warehouseName = warehouse.name,
+                    unit = material.mainUnit,
+                    quantity = quantity,
+                    approximateValue = (quantity.coerceAtLeast(0.0) * unitPrice).toLong(),
+                    minimumStock = material.minimumStock,
+                    isLowStock = quantity < material.minimumStock,
+                    emoji = material.imageEmoji
+                )
             }
         }
         return inventory.sortedWith(compareByDescending<InventoryItem> { it.isLowStock }.thenBy { it.materialName })

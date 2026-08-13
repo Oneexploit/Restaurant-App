@@ -71,6 +71,7 @@ import com.restaurant.offlinemanager.data.local.entity.WarehouseType
 import com.restaurant.offlinemanager.domain.model.InventoryItem
 import com.restaurant.offlinemanager.domain.model.StockTransactionInput
 import com.restaurant.offlinemanager.domain.model.label
+import com.restaurant.offlinemanager.domain.usecase.InventoryIntegrityValidator
 import com.restaurant.offlinemanager.ui.AppUiState
 import java.time.Instant
 import java.time.ZoneId
@@ -129,8 +130,9 @@ private fun InventoryTab(
     val lowStock = items.filter { it.isLowStock }
     val today = PersianDateFormatter.todayStartMillis()
     val todayTransactions = state.snapshot.stockTransactions.filter { it.date.isSameLocalDay(today) }
-    val todayIn = todayTransactions.filter { it.type == StockTransactionType.IN || it.type == StockTransactionType.TRANSFER_IN }.sumOf { it.quantity }
-    val todayOut = todayTransactions.filter { it.type == StockTransactionType.OUT || it.type == StockTransactionType.TRANSFER_OUT || it.type == StockTransactionType.WASTE }.sumOf { it.quantity }
+    val signedTodayTransactions = todayTransactions.map(InventoryIntegrityValidator::signedQuantity)
+    val todayIn = signedTodayTransactions.filter { it > 0 }.sum()
+    val todayOut = -signedTodayTransactions.filter { it < 0 }.sum()
 
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { AppSearchBar(query, { query = it }, label = "جستجو در موجودی") }
@@ -316,7 +318,8 @@ private fun TransactionsTab(state: AppUiState, onDeleteStockTransaction: (Long) 
             items(transactions, key = { it.id }) { tx ->
                 val warehouse = state.snapshot.warehouses.firstOrNull { it.id == tx.warehouseId }
                 val material = state.snapshot.materials.firstOrNull { it.id == tx.materialId }
-                val positive = tx.type == StockTransactionType.IN || tx.type == StockTransactionType.TRANSFER_IN
+                val signedQuantity = InventoryIntegrityValidator.signedQuantity(tx)
+                val positive = signedQuantity > 0
                 GlassCard(Modifier.fillMaxWidth(), accent = if (positive) AppGreen else AppOrange) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Outlined.Inventory, contentDescription = null, tint = if (positive) AppGreen else AppOrange)
@@ -327,7 +330,10 @@ private fun TransactionsTab(state: AppUiState, onDeleteStockTransaction: (Long) 
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             StatusChip(tx.reason.label(), if (positive) AppGreen else AppOrange)
-                            Text("${NumberFormatter.format(tx.quantity)} ${tx.unit.label()}", color = TextPrimary)
+                            Text(
+                                "${if (signedQuantity > 0) "+" else ""}${NumberFormatter.format(signedQuantity)} ${tx.unit.label()}",
+                                color = if (positive) AppGreen else AppOrange
+                            )
                         }
                     }
                     if (tx.purchaseId == null) {

@@ -367,7 +367,7 @@ class RoomRestaurantRepository(
                 title = entity.title.trim(),
                 ownerName = entity.ownerName?.trim()?.ifBlank { null },
                 bankName = entity.bankName?.trim()?.ifBlank { null },
-                cardNumber = entity.cardNumber?.let(::safeStoredCardNumber),
+                cardNumber = entity.cardNumber?.let(::normalizeStoredCardNumber),
                 notes = entity.notes?.trim()?.ifBlank { null },
                 createdAt = entity.createdAt.takeIf { it > 0 } ?: now,
                 updatedAt = now
@@ -632,10 +632,9 @@ class RoomRestaurantRepository(
 
 private fun Long?.orZero(): Long = this ?: 0L
 
-private fun safeStoredCardNumber(value: String): String? {
+private fun normalizeStoredCardNumber(value: String): String? {
     val digits = value.filter { it.isDigit() }
-    if (digits.isBlank()) return null
-    return if (digits.length <= 8) digits else digits.take(4) + digits.takeLast(4)
+    return digits.ifBlank { null }
 }
 
 private fun stockTransactionsReplacingPurchase(

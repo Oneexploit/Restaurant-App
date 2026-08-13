@@ -34,6 +34,8 @@ object NumberFormatter {
                     persianIndex >= 0 -> append('0' + persianIndex)
                     arabicIndex >= 0 -> append('0' + arabicIndex)
                     char == ',' || char == '٬' || char == ' ' -> Unit
+                    char == '٫' -> append('.')
+                    char == '−' -> append('-')
                     else -> append(char)
                 }
             }

@@ -195,30 +195,47 @@ fun FinanceDashboardScreen(
                 if (state.snapshot.projectPayments.isEmpty() && state.snapshot.supplierPayments.isEmpty()) {
                     item { EmptyState("پرداختی ثبت نشده", "دریافت از پروژه و پرداخت به تامین‌کننده در این بخش تجمیع می‌شود.") }
                 } else {
-                    items(state.snapshot.projectPayments, key = { "p${it.id}" }) { payment ->
-                        val project = state.snapshot.projects.firstOrNull { it.id == payment.projectId }
+                    val payments = (
+                        state.snapshot.projectPayments.map { payment ->
+                            PaymentListItem(
+                                key = "project-${payment.id}",
+                                kind = "دریافت پروژه",
+                                name = state.snapshot.projects.firstOrNull { it.id == payment.projectId }?.name.orEmpty(),
+                                amount = payment.amount,
+                                date = payment.date,
+                                method = payment.method.label(),
+                                isProjectPayment = true,
+                                id = payment.id
+                            )
+                        } + state.snapshot.supplierPayments.map { payment ->
+                            PaymentListItem(
+                                key = "supplier-${payment.id}",
+                                kind = "پرداخت تامین‌کننده",
+                                name = state.snapshot.suppliers.firstOrNull { it.id == payment.supplierId }?.name.orEmpty(),
+                                amount = payment.amount,
+                                date = payment.date,
+                                method = payment.method.label(),
+                                isProjectPayment = false,
+                                id = payment.id
+                            )
+                        }
+                    ).sortedWith(compareByDescending<PaymentListItem> { it.date }.thenByDescending { it.id })
+                    items(payments, key = { it.key }) { payment ->
                         PaymentCard(
-                            kind = "دریافت پروژه",
-                            name = project?.name.orEmpty(),
+                            kind = payment.kind,
+                            name = payment.name,
                             amount = payment.amount,
                             date = payment.date,
-                            method = payment.method.label(),
-                            color = AppGreen,
-                            onEdit = { onEditProjectPayment(payment.id) },
-                            onDelete = { deleteProjectPaymentId = payment.id }
-                        )
-                    }
-                    items(state.snapshot.supplierPayments, key = { "s${it.id}" }) { payment ->
-                        val supplier = state.snapshot.suppliers.firstOrNull { it.id == payment.supplierId }
-                        PaymentCard(
-                            kind = "پرداخت تامین‌کننده",
-                            name = supplier?.name.orEmpty(),
-                            amount = payment.amount,
-                            date = payment.date,
-                            method = payment.method.label(),
-                            color = AppOrange,
-                            onEdit = { onEditSupplierPayment(payment.id) },
-                            onDelete = { deleteSupplierPaymentId = payment.id }
+                            method = payment.method,
+                            color = if (payment.isProjectPayment) AppGreen else AppOrange,
+                            onEdit = {
+                                if (payment.isProjectPayment) onEditProjectPayment(payment.id)
+                                else onEditSupplierPayment(payment.id)
+                            },
+                            onDelete = {
+                                if (payment.isProjectPayment) deleteProjectPaymentId = payment.id
+                                else deleteSupplierPaymentId = payment.id
+                            }
                         )
                     }
                 }
@@ -715,7 +732,13 @@ fun BankCardFormScreen(
         item {
             FormActionFooter("ذخیره", onClick = {
                 val initial = MoneyFormatter.parse(balance)
-                error = if (title.isBlank()) "عنوان کارت الزامی است" else null
+                val cardDigits = number.filter(Char::isDigit)
+                val existingDigits = editing?.cardNumber.orEmpty().filter(Char::isDigit)
+                error = when {
+                    title.isBlank() -> "عنوان کارت الزامی است"
+                    cardDigits.isNotEmpty() && cardDigits.length != 16 && cardDigits != existingDigits -> "شماره کارت باید ۱۶ رقم باشد"
+                    else -> null
+                }
                 if (error == null) {
                     onSave(
                         BankCardEntity(
@@ -736,6 +759,17 @@ fun BankCardFormScreen(
         }
     }
 }
+
+private data class PaymentListItem(
+    val key: String,
+    val kind: String,
+    val name: String,
+    val amount: Long,
+    val date: Long,
+    val method: String,
+    val isProjectPayment: Boolean,
+    val id: Long
+)
 
 @Composable
 fun ExpenseFormScreen(
