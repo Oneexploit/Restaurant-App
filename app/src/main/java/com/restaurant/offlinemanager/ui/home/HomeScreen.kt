@@ -90,7 +90,6 @@ fun HomeScreen(
         .filter { it.date.isSameLocalDay(today) }
         .take(3)
     val lowStock = if (lowStockAlertsEnabled) state.inventory.filter { it.isLowStock }.take(4) else emptyList()
-    val recentActivity = rememberHomeActivity(state)
     val setupSteps = rememberSetupSteps(
         state = state,
         onAddProject = onAddProject,
@@ -221,16 +220,6 @@ fun HomeScreen(
             }
             items(lowStock, key = { "${it.warehouseId}-${it.materialId}" }) { item ->
                 LowStockRow(item)
-            }
-        }
-        item {
-            SectionHeader("آخرین فعالیت‌ها")
-        }
-        if (recentActivity.isEmpty()) {
-            item { EmptyState("فعالیتی ثبت نشده", "بعد از ثبت وعده، خرید یا پرداخت، رویدادها اینجا دیده می‌شوند.") }
-        } else {
-            items(recentActivity, key = { it.id }) { activity ->
-                RecentActivityRow(activity)
             }
         }
         item { Spacer(Modifier.height(18.dp)) }
@@ -409,82 +398,6 @@ private fun LowStockRow(item: InventoryItem) {
             accent = AppOrange,
             valueLabel = "${NumberFormatter.format(item.quantity)} / ${NumberFormatter.format(item.minimumStock)}"
         )
-    }
-}
-
-private data class HomeActivity(
-    val id: String,
-    val title: String,
-    val subtitle: String,
-    val date: Long,
-    val amount: Long?,
-    val icon: ImageVector,
-    val color: Color
-)
-
-@Composable
-private fun rememberHomeActivity(state: AppUiState): List<HomeActivity> =
-    androidx.compose.runtime.remember(state.snapshot) {
-        buildList {
-            state.snapshot.mealDeliveries.take(8).forEach { meal ->
-                val project = state.snapshot.projects.firstOrNull { it.id == meal.projectId }
-                add(
-                    HomeActivity(
-                        id = "meal-${meal.id}",
-                        title = "ثبت وعده ${meal.mealType.label()}",
-                        subtitle = project?.name ?: "پروژه حذف‌شده",
-                        date = meal.date,
-                        amount = meal.totalAmount,
-                        icon = Icons.Outlined.Restaurant,
-                        color = AppCyan
-                    )
-                )
-            }
-            state.snapshot.purchases.take(8).forEach { purchase ->
-                val supplier = state.snapshot.suppliers.firstOrNull { it.id == purchase.supplierId }
-                add(
-                    HomeActivity(
-                        id = "purchase-${purchase.id}",
-                        title = "ثبت فاکتور خرید",
-                        subtitle = supplier?.name ?: purchase.invoiceNumber.orEmpty().ifBlank { "خرید روزانه" },
-                        date = purchase.date,
-                        amount = purchase.totalAmount,
-                        icon = Icons.Outlined.ShoppingCart,
-                        color = AppOrange
-                    )
-                )
-            }
-            state.snapshot.projectPayments.take(8).forEach { payment ->
-                val project = state.snapshot.projects.firstOrNull { it.id == payment.projectId }
-                add(
-                    HomeActivity(
-                        id = "project-payment-${payment.id}",
-                        title = "دریافت از پروژه",
-                        subtitle = project?.name ?: "پروژه",
-                        date = payment.date,
-                        amount = payment.amount,
-                        icon = Icons.Outlined.Payments,
-                        color = AppGreen
-                    )
-                )
-            }
-        }.sortedByDescending { it.date }.take(5)
-    }
-
-@Composable
-private fun RecentActivityRow(activity: HomeActivity) {
-    GlassCard(modifier = Modifier.fillMaxWidth(), accent = activity.color) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(activity.icon, contentDescription = null, tint = activity.color)
-            Column(modifier = Modifier.weight(1f)) {
-                Text(activity.title, color = TextPrimary, style = MaterialTheme.typography.titleMedium)
-                Text(activity.subtitle, color = TextSecondary, maxLines = 1)
-                PersianDateText(activity.date, color = TextMuted)
-            }
-            activity.amount?.let {
-                MoneyText(it, style = MaterialTheme.typography.titleMedium)
-            }
-        }
     }
 }
 
