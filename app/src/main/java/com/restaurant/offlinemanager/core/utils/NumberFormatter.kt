@@ -39,4 +39,17 @@ object NumberFormatter {
             }
         }
     }
+
+    /** Formats a positive integer while it is being typed, without converting it to a fixed-size number. */
+    fun formatMoneyInput(input: String): String {
+        val digits = normalizeDigits(input).filter(Char::isDigit)
+        if (digits.isEmpty()) return ""
+        val normalized = digits.trimStart('0').ifEmpty { "0" }
+        val grouped = normalized
+            .reversed()
+            .chunked(3)
+            .joinToString(",")
+            .reversed()
+        return toPersianDigits(grouped)
+    }
 }

@@ -1386,8 +1386,8 @@ fun MoneyInputField(
     modifier: Modifier = Modifier
 ) {
     DarkOutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
+        value = NumberFormatter.formatMoneyInput(value),
+        onValueChange = { onValueChange(NumberFormatter.formatMoneyInput(it)) },
         label = label,
         modifier = modifier,
         keyboardType = KeyboardType.Number
