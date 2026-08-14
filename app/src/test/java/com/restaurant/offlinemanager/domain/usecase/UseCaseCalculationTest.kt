@@ -48,6 +48,14 @@ class UseCaseCalculationTest {
     private val now = 1_000L
 
     @Test
+    fun quantityInputKeepsDecimalsAndAddsThousandsSeparators() {
+        val formatted = com.restaurant.offlinemanager.core.utils.NumberFormatter.formatQuantityInput("۱۲۵۰۰٫۷۵")
+
+        assertEquals("۱۲,۵۰۰.۷۵", formatted)
+        assertEquals("12500.75", com.restaurant.offlinemanager.core.utils.NumberFormatter.normalizeDigits(formatted))
+    }
+
+    @Test
     fun projectReceivableSubtractsPaymentsFromDeliveries() {
         val project = project()
         val snapshot = RestaurantSnapshot(

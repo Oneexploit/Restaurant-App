@@ -54,4 +54,29 @@ object NumberFormatter {
             .reversed()
         return toPersianDigits(grouped)
     }
+
+    /** Formats a quantity while typing, preserving a decimal part and an optional minus sign. */
+    fun formatQuantityInput(input: String, allowNegative: Boolean = false): String {
+        val normalized = normalizeDigits(input)
+            .replace('٫', '.')
+            .filter { it.isDigit() || it == '.' || (allowNegative && it == '-') }
+        val negative = allowNegative && normalized.startsWith('-')
+        val unsigned = normalized.replace("-", "")
+        val hasDecimal = unsigned.contains('.')
+        val parts = unsigned.split('.', limit = 2)
+        val integerDigits = parts.firstOrNull().orEmpty().filter(Char::isDigit)
+        val fractionDigits = parts.getOrNull(1).orEmpty().filter(Char::isDigit).take(3)
+        if (integerDigits.isEmpty() && !hasDecimal) return if (negative) "-" else ""
+        val integer = integerDigits.trimStart('0').ifEmpty { "0" }
+        val grouped = integer.reversed().chunked(3).joinToString(",").reversed()
+        val result = buildString {
+            if (negative) append('-')
+            append(grouped)
+            if (hasDecimal) {
+                append('.')
+                append(fractionDigits)
+            }
+        }
+        return toPersianDigits(result)
+    }
 }

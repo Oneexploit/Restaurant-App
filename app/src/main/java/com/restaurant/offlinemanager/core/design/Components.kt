@@ -1496,8 +1496,8 @@ fun QuantityInputField(
     allowNegative: Boolean = false
 ) {
     DarkOutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
+        value = NumberFormatter.formatQuantityInput(value, allowNegative),
+        onValueChange = { onValueChange(NumberFormatter.formatQuantityInput(it, allowNegative)) },
         label = label,
         modifier = modifier,
         keyboardType = if (allowNegative) KeyboardType.Text else KeyboardType.Decimal
