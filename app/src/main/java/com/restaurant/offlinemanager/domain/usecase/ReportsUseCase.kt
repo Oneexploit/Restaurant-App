@@ -59,6 +59,30 @@ class ReportsUseCase(
         }
     }
 
+    fun cookingCsv(snapshot: RestaurantSnapshot): String = buildString {
+        appendLine(csvRow("date", "meal", "produced", "warehouse", "materials", "companies", "total_cost", "cost_per_meal"))
+        val costs = inventoryUseCase.cookingBatchCosts(snapshot).associateBy { it.batchId }
+        snapshot.cookingBatches.forEach { batch ->
+            val warehouse = snapshot.warehouses.firstOrNull { it.id == batch.warehouseId }?.name.orEmpty()
+            val materialCount = snapshot.stockTransactions.count { it.cookingBatchId == batch.id }
+            val companyCount = snapshot.cookingAllocations.count { it.batchId == batch.id }
+            val cost = costs[batch.id]
+            appendLine(csvRow(PersianDateFormatter.format(batch.date), batch.mealType.label(), batch.producedQuantity, warehouse, materialCount, companyCount, cost?.totalCost ?: 0, cost?.costPerMeal ?: 0))
+        }
+    }
+
+    fun mealProfitCsv(snapshot: RestaurantSnapshot): String = buildString {
+        appendLine(csvRow("meal", "delivered", "revenue", "material_cost", "gross_profit", "margin_percent"))
+        val batchCosts = inventoryUseCase.cookingBatchCosts(snapshot).associateBy { it.batchId }
+        com.restaurant.offlinemanager.data.local.entity.MealType.entries.forEach { mealType ->
+            val deliveries = snapshot.mealDeliveries.filter { it.mealType == mealType && it.status == com.restaurant.offlinemanager.data.local.entity.DeliveryStatus.DELIVERED }
+            val revenue = deliveries.sumOf { it.totalAmount }
+            val materialCost = snapshot.cookingBatches.filter { it.mealType == mealType }.sumOf { batchCosts[it.id]?.totalCost ?: 0 }
+            val profit = revenue - materialCost
+            appendLine(csvRow(mealType.label(), deliveries.sumOf { it.quantity - it.returnedQuantity }, revenue, materialCost, profit, if (revenue > 0) profit * 100.0 / revenue else 0.0))
+        }
+    }
+
     fun inventoryCsv(snapshot: RestaurantSnapshot): String = buildString {
         appendLine(csvRow("warehouse", "material", "quantity", "unit", "value", "status"))
         inventoryUseCase.calculateInventory(snapshot).forEach { item ->
@@ -112,9 +136,9 @@ class ReportsUseCase(
     }
 
     fun projectProfitCsv(snapshot: RestaurantSnapshot): String = buildString {
-        appendLine(csvRow("project", "earned_revenue", "material_cost", "gross_profit", "margin_percent"))
+        appendLine(csvRow("project", "earned_revenue", "material_cost", "gross_profit", "operating_cost", "net_profit", "margin_percent"))
         accountingUseCase.projectProfits(snapshot).forEach { profit ->
-            appendLine(csvRow(profit.project.name, profit.earnedRevenue, profit.materialCost, profit.grossProfit, profit.marginPercent))
+            appendLine(csvRow(profit.project.name, profit.earnedRevenue, profit.materialCost, profit.grossProfit, profit.operatingCost, profit.netProfit, profit.marginPercent))
         }
     }
 

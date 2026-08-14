@@ -39,19 +39,39 @@ class AccountingUseCase(private val inventoryUseCase: InventoryUseCase) {
 
     fun projectProfits(snapshot: RestaurantSnapshot): List<ProjectProfit> {
         val costs = inventoryUseCase.projectMaterialCosts(snapshot)
+        val allocatedOperatingCosts = mutableMapOf<Long, Long>()
+        snapshot.expenses.forEach { expense ->
+            expense.projectId?.let { projectId ->
+                allocatedOperatingCosts[projectId] = (allocatedOperatingCosts[projectId] ?: 0L) + expense.amount
+            }
+            if (expense.projectId == null) expense.cookingBatchId?.let { batchId ->
+                val allocations = snapshot.cookingAllocations.filter { it.batchId == batchId }
+                val total = allocations.sumOf { it.quantity }
+                if (total > 0) allocations.forEachIndexed { index, allocation ->
+                    val share = if (index == allocations.lastIndex) {
+                        expense.amount - allocations.dropLast(1).sumOf { expense.amount * it.quantity / total }
+                    } else expense.amount * allocation.quantity / total
+                    allocatedOperatingCosts[allocation.projectId] = (allocatedOperatingCosts[allocation.projectId] ?: 0L) + share
+                }
+            }
+        }
         return snapshot.projects.map { project ->
             val revenue = snapshot.mealDeliveries
                 .filter { it.projectId == project.id && it.status == DeliveryStatus.DELIVERED }
                 .sumOf { it.totalAmount }
             val materialCost = costs[project.id] ?: 0L
-            val profit = revenue - materialCost
+            val grossProfit = revenue - materialCost
+            val operatingCost = allocatedOperatingCosts[project.id] ?: 0L
+            val netProfit = grossProfit - operatingCost
             ProjectProfit(
                 project = project,
                 earnedRevenue = revenue,
                 materialCost = materialCost,
-                grossProfit = profit,
-                marginPercent = if (revenue > 0) profit * 100.0 / revenue else 0.0
+                grossProfit = grossProfit,
+                operatingCost = operatingCost,
+                netProfit = netProfit,
+                marginPercent = if (revenue > 0) netProfit * 100.0 / revenue else 0.0
             )
-        }.sortedByDescending { it.grossProfit }
+        }.sortedByDescending { it.netProfit }
     }
 }

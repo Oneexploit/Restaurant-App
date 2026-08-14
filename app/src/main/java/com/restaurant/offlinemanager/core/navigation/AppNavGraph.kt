@@ -28,6 +28,8 @@ import com.restaurant.offlinemanager.core.design.AppScaffold
 import com.restaurant.offlinemanager.core.security.AppLockGate
 import com.restaurant.offlinemanager.data.local.entity.StockTransactionType
 import com.restaurant.offlinemanager.ui.RestaurantViewModel
+import com.restaurant.offlinemanager.ui.cooking.CookingFormScreen
+import com.restaurant.offlinemanager.ui.cooking.CookingListScreen
 import com.restaurant.offlinemanager.ui.finance.BankCardFormScreen
 import com.restaurant.offlinemanager.ui.finance.ExpenseFormScreen
 import com.restaurant.offlinemanager.ui.finance.FinanceDashboardScreen
@@ -179,6 +181,23 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
                     onEditMeal = { navController.navigate("${Routes.AddEditMealDelivery}/0/$it") },
                     onDeleteMeal = viewModel::deleteMealDelivery
                 )
+            }
+            composable(Routes.CookingList) {
+                CookingListScreen(
+                    state = state,
+                    onAdd = { navController.navigate("${Routes.AddEditCooking}/0") },
+                    onEdit = { navController.navigate("${Routes.AddEditCooking}/$it") },
+                    onDelete = viewModel::deleteCookingBatch
+                )
+            }
+            composable(
+                route = "${Routes.AddEditCooking}/{batchId}",
+                arguments = listOf(navArgument("batchId") { type = NavType.LongType })
+            ) { entry ->
+                val batchId = entry.arguments?.getLong("batchId")?.takeIf { it != 0L }
+                CookingFormScreen(state, batchId, onSave = {
+                    viewModel.saveCookingBatch(it) { navController.popBackStack() }
+                })
             }
             composable(
                 route = "${Routes.AddEditMealDelivery}/{projectId}/{deliveryId}",
@@ -392,6 +411,7 @@ private fun bottomRouteFor(route: String?): String? =
         route.startsWith(Routes.Home) -> Routes.Home
         route.startsWith(Routes.ProjectsList) || route.startsWith(Routes.ProjectDetails) || route.startsWith(Routes.AddEditProject) || route.startsWith(Routes.MealDeliveryList) || route.startsWith(Routes.AddEditMealDelivery) -> Routes.ProjectsList
         route.startsWith(Routes.WarehousesList) || route.startsWith(Routes.AddStockIn) || route.startsWith(Routes.AddStockOut) || route.startsWith(Routes.TransferStock) || route.startsWith(Routes.AddStockWaste) || route.startsWith(Routes.AddStockAdjustment) || route.startsWith(Routes.AddEditWarehouse) || route.startsWith(Routes.AddEditMaterial) -> Routes.WarehousesList
+        route.startsWith(Routes.CookingList) || route.startsWith(Routes.AddEditCooking) -> Routes.CookingList
         route.startsWith(Routes.FinanceDashboard) || route.startsWith(Routes.AddProjectPayment) || route.startsWith(Routes.AddSupplierPayment) || route.startsWith(Routes.AddEditBankCard) || route.startsWith(Routes.AddExpense) -> Routes.FinanceDashboard
         route.startsWith(Routes.PurchasesList) || route.startsWith(Routes.AddEditPurchase) || route.startsWith(Routes.AddSupplier) -> Routes.PurchasesList
         route.startsWith(Routes.Reports) -> Routes.Reports
@@ -401,10 +421,12 @@ private fun bottomRouteFor(route: String?): String? =
 private fun titleFor(route: String?): String =
     when {
         route == null || route.startsWith(Routes.Home) -> "خانه"
-        route.startsWith(Routes.ProjectsList) -> "پروژه‌ها"
-        route.startsWith(Routes.ProjectDetails) -> "جزئیات پروژه"
-        route.startsWith(Routes.AddEditProject) -> "فرم پروژه"
+        route.startsWith(Routes.ProjectsList) -> "شرکت‌ها و قراردادها"
+        route.startsWith(Routes.ProjectDetails) -> "جزئیات قرارداد"
+        route.startsWith(Routes.AddEditProject) -> "فرم قرارداد"
         route.startsWith(Routes.MealDeliveryList) || route.startsWith(Routes.AddEditMealDelivery) -> "تحویل غذا"
+        route.startsWith(Routes.CookingList) -> "مصرف و پخت"
+        route.startsWith(Routes.AddEditCooking) -> "ثبت پخت و مصرف"
         route.startsWith(Routes.WarehousesList) -> "انبار"
         route.startsWith(Routes.AddStockIn) -> "ورود کالا"
         route.startsWith(Routes.AddStockOut) -> "خروج کالا"

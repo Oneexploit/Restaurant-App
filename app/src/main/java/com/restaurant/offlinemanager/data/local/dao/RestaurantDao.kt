@@ -6,6 +6,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.restaurant.offlinemanager.data.local.entity.BankCardEntity
+import com.restaurant.offlinemanager.data.local.entity.CookingAllocationEntity
+import com.restaurant.offlinemanager.data.local.entity.CookingBatchEntity
 import com.restaurant.offlinemanager.data.local.entity.ExpenseEntity
 import com.restaurant.offlinemanager.data.local.entity.MaterialEntity
 import com.restaurant.offlinemanager.data.local.entity.MealDeliveryEntity
@@ -57,6 +59,12 @@ interface RestaurantDao {
     @Query("SELECT * FROM expenses ORDER BY date DESC, id DESC")
     fun observeExpenses(): Flow<List<ExpenseEntity>>
 
+    @Query("SELECT * FROM cooking_batches ORDER BY date DESC, id DESC")
+    fun observeCookingBatches(): Flow<List<CookingBatchEntity>>
+
+    @Query("SELECT * FROM cooking_allocations ORDER BY batchId DESC, id")
+    fun observeCookingAllocations(): Flow<List<CookingAllocationEntity>>
+
     @Query("SELECT * FROM projects ORDER BY id")
     suspend fun getProjects(): List<ProjectEntity>
 
@@ -92,6 +100,12 @@ interface RestaurantDao {
 
     @Query("SELECT * FROM expenses ORDER BY id")
     suspend fun getExpenses(): List<ExpenseEntity>
+
+    @Query("SELECT * FROM cooking_batches ORDER BY id")
+    suspend fun getCookingBatches(): List<CookingBatchEntity>
+
+    @Query("SELECT * FROM cooking_allocations ORDER BY id")
+    suspend fun getCookingAllocations(): List<CookingAllocationEntity>
 
     @Query("SELECT * FROM projects WHERE id = :id LIMIT 1")
     suspend fun getProject(id: Long): ProjectEntity?
@@ -142,6 +156,12 @@ interface RestaurantDao {
     suspend fun insertExpense(entity: ExpenseEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCookingBatch(entity: CookingBatchEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCookingAllocation(entity: CookingAllocationEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProjects(entities: List<ProjectEntity>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -176,6 +196,12 @@ interface RestaurantDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertExpenses(entities: List<ExpenseEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCookingBatches(entities: List<CookingBatchEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCookingAllocations(entities: List<CookingAllocationEntity>)
 
     @Update
     suspend fun updateProject(entity: ProjectEntity)
@@ -216,6 +242,12 @@ interface RestaurantDao {
     @Query("DELETE FROM expenses")
     suspend fun clearExpenses()
 
+    @Query("DELETE FROM cooking_batches")
+    suspend fun clearCookingBatches()
+
+    @Query("DELETE FROM cooking_allocations")
+    suspend fun clearCookingAllocations()
+
     @Query("DELETE FROM warehouses WHERE id = :id")
     suspend fun deleteWarehouse(id: Long)
 
@@ -251,4 +283,13 @@ interface RestaurantDao {
 
     @Query("DELETE FROM expenses WHERE id = :id")
     suspend fun deleteExpense(id: Long)
+
+    @Query("DELETE FROM cooking_allocations WHERE batchId = :batchId")
+    suspend fun deleteCookingAllocationsForBatch(batchId: Long)
+
+    @Query("DELETE FROM stock_transactions WHERE cookingBatchId = :batchId")
+    suspend fun deleteStockTransactionsForCookingBatch(batchId: Long)
+
+    @Query("DELETE FROM cooking_batches WHERE id = :id")
+    suspend fun deleteCookingBatch(id: Long)
 }

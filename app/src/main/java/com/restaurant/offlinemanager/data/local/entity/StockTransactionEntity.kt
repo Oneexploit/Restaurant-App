@@ -12,6 +12,7 @@ import androidx.room.PrimaryKey
         Index("projectId"),
         Index("supplierId"),
         Index("purchaseId"),
+        Index("cookingBatchId"),
         Index("date")
     ]
 )
@@ -22,6 +23,7 @@ data class StockTransactionEntity(
     val projectId: Long? = null,
     val supplierId: Long? = null,
     val purchaseId: Long? = null,
+    val cookingBatchId: Long? = null,
     val type: StockTransactionType,
     val reason: StockReason,
     val quantity: Double,

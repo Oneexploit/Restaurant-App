@@ -8,6 +8,7 @@ import com.restaurant.offlinemanager.data.local.entity.MaterialEntity
 import com.restaurant.offlinemanager.data.local.entity.SupplierEntity
 import com.restaurant.offlinemanager.data.local.entity.WarehouseEntity
 import com.restaurant.offlinemanager.domain.model.MealDeliveryInput
+import com.restaurant.offlinemanager.domain.model.CookingBatchInput
 import com.restaurant.offlinemanager.domain.model.ProjectInput
 import com.restaurant.offlinemanager.domain.model.ProjectPaymentInput
 import com.restaurant.offlinemanager.domain.model.PurchaseInput
@@ -23,6 +24,7 @@ interface RestaurantRepository {
     suspend fun saveProject(input: ProjectInput): Long
     suspend fun archiveProject(projectId: Long): Result<Unit>
     suspend fun saveMealDelivery(input: MealDeliveryInput): Result<Long>
+    suspend fun saveCookingBatch(input: CookingBatchInput): Result<Long>
     suspend fun saveWarehouse(entity: WarehouseEntity): Long
     suspend fun saveMaterial(entity: MaterialEntity): Long
     suspend fun saveSupplier(entity: SupplierEntity): Long
@@ -34,6 +36,7 @@ interface RestaurantRepository {
     suspend fun saveSupplierPayment(input: SupplierPaymentInput): Result<Long>
     suspend fun saveExpense(entity: ExpenseEntity): Long
     suspend fun deleteMealDelivery(id: Long): Result<Unit>
+    suspend fun deleteCookingBatch(id: Long): Result<Unit>
     suspend fun deleteWarehouse(id: Long): Result<Unit>
     suspend fun deleteMaterial(id: Long): Result<Unit>
     suspend fun deleteSupplier(id: Long): Result<Unit>

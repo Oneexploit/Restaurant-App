@@ -56,6 +56,7 @@ import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
 import com.restaurant.offlinemanager.data.local.entity.MealType
 import com.restaurant.offlinemanager.data.local.entity.DeliveryStatus
 import com.restaurant.offlinemanager.data.local.entity.billableQuantity
+import com.restaurant.offlinemanager.data.local.entity.priceFor
 import com.restaurant.offlinemanager.data.local.entity.ProjectEntity
 import com.restaurant.offlinemanager.data.local.entity.ProjectStatus
 import com.restaurant.offlinemanager.domain.model.MealDeliveryInput
@@ -177,7 +178,7 @@ fun MealDeliveryFormScreen(
     var status by remember(editing?.id) { mutableStateOf(editing?.status ?: DeliveryStatus.DELIVERED) }
     var quantity by remember(editing?.id) { mutableStateOf(editing?.quantity?.toString() ?: selectedProject?.workerCount?.toString().orEmpty()) }
     var returnedQuantity by remember(editing?.id) { mutableStateOf(editing?.returnedQuantity?.toString() ?: "0") }
-    var unitPrice by remember(editing?.id) { mutableStateOf(editing?.unitPrice?.toString() ?: selectedProject?.mealPrice?.toString().orEmpty()) }
+    var unitPrice by remember(editing?.id) { mutableStateOf(editing?.unitPrice?.toString() ?: selectedProject?.priceFor(mealType)?.toString().orEmpty()) }
     var date by remember(editing?.id) { mutableLongStateOf(editing?.date ?: PersianDateFormatter.todayStartMillis()) }
     var deliveryTime by remember(editing?.id) {
         val now = Calendar.getInstance()
@@ -193,7 +194,7 @@ fun MealDeliveryFormScreen(
             if (editing == null) {
                 mealType = it.defaultMealType.toMealTypeOrDefault()
                 quantity = it.workerCount.toString()
-                unitPrice = it.mealPrice.toString()
+                unitPrice = it.priceFor(mealType).toString()
             } else if (quantity.isBlank()) {
                 quantity = it.workerCount.toString()
             }
@@ -222,14 +223,17 @@ fun MealDeliveryFormScreen(
             OptionSelector("انتخاب پروژه", filteredProjects, selectedProject, { "${it.name} • ${it.workerCount} نفر" }) {
                 selectedProject = it
                 quantity = it.workerCount.toString()
-                unitPrice = it.mealPrice.toString()
+                unitPrice = it.priceFor(mealType).toString()
             }
         }
         item {
             FilterChipRow(
                 options = MealType.entries.map { it.label() },
                 selected = mealType.label(),
-                onSelected = { label -> mealType = MealType.entries.first { it.label() == label } }
+                onSelected = { label ->
+                    mealType = MealType.entries.first { it.label() == label }
+                    if (editing == null) unitPrice = selectedProject?.priceFor(mealType)?.toString().orEmpty()
+                }
             )
         }
         item {

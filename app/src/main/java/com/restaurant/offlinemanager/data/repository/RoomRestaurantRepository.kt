@@ -7,6 +7,8 @@ import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
 import com.restaurant.offlinemanager.data.local.AppDatabase
 import com.restaurant.offlinemanager.data.local.dao.RestaurantDao
 import com.restaurant.offlinemanager.data.local.entity.BankCardEntity
+import com.restaurant.offlinemanager.data.local.entity.CookingAllocationEntity
+import com.restaurant.offlinemanager.data.local.entity.CookingBatchEntity
 import com.restaurant.offlinemanager.data.local.entity.ExpenseCategory
 import com.restaurant.offlinemanager.data.local.entity.ExpenseEntity
 import com.restaurant.offlinemanager.data.local.entity.MaterialEntity
@@ -30,6 +32,7 @@ import com.restaurant.offlinemanager.data.local.entity.WarehouseEntity
 import com.restaurant.offlinemanager.data.local.entity.WarehouseType
 import com.restaurant.offlinemanager.data.mapper.toEntity
 import com.restaurant.offlinemanager.domain.model.MealDeliveryInput
+import com.restaurant.offlinemanager.domain.model.CookingBatchInput
 import com.restaurant.offlinemanager.domain.model.ProjectInput
 import com.restaurant.offlinemanager.domain.model.ProjectPaymentInput
 import com.restaurant.offlinemanager.domain.model.PurchaseItemInput
@@ -67,7 +70,9 @@ class RoomRestaurantRepository(
             dao.observeBankCards().map { it as Any },
             dao.observeProjectPayments().map { it as Any },
             dao.observeSupplierPayments().map { it as Any },
-            dao.observeExpenses().map { it as Any }
+            dao.observeExpenses().map { it as Any },
+            dao.observeCookingBatches().map { it as Any },
+            dao.observeCookingAllocations().map { it as Any }
         )
         return combine(*flows) { values ->
             @Suppress("UNCHECKED_CAST")
@@ -83,7 +88,9 @@ class RoomRestaurantRepository(
                 bankCards = values[8] as List<BankCardEntity>,
                 projectPayments = values[9] as List<ProjectPaymentEntity>,
                 supplierPayments = values[10] as List<SupplierPaymentEntity>,
-                expenses = values[11] as List<ExpenseEntity>
+                expenses = values[11] as List<ExpenseEntity>,
+                cookingBatches = values[12] as List<CookingBatchEntity>,
+                cookingAllocations = values[13] as List<CookingAllocationEntity>
             )
         }
     }
@@ -101,13 +108,16 @@ class RoomRestaurantRepository(
             bankCards = dao.getBankCards(),
             projectPayments = dao.getProjectPayments(),
             supplierPayments = dao.getSupplierPayments(),
-            expenses = dao.getExpenses()
+            expenses = dao.getExpenses(),
+            cookingBatches = dao.getCookingBatches(),
+            cookingAllocations = dao.getCookingAllocations()
         )
 
     override suspend fun saveProject(input: ProjectInput): Long {
         require(input.name.isNotBlank()) { "نام پروژه الزامی است" }
         require(input.workerCount > 0) { "تعداد نفرات باید بیشتر از صفر باشد" }
         require(input.mealPrice > 0) { "قیمت هر وعده باید بیشتر از صفر باشد" }
+        require(input.breakfastPrice > 0 && input.lunchPrice > 0 && input.dinnerPrice > 0) { "قیمت همه وعده‌ها باید بیشتر از صفر باشد" }
         require(input.endDate == null || input.endDate >= input.startDate) { "تاریخ پایان نمی‌تواند قبل از تاریخ شروع باشد" }
         val now = PersianDateFormatter.nowMillis()
         val existing = if (input.id == 0L) null else dao.getProject(input.id)
@@ -169,6 +179,79 @@ class RoomRestaurantRepository(
             }
             dao.insertMealDelivery(candidate)
         }
+
+    override suspend fun saveCookingBatch(input: CookingBatchInput): Result<Long> = runCatching {
+        require(input.producedQuantity > 0) { "تعداد غذای پخته‌شده باید بیشتر از صفر باشد" }
+        require(input.materials.isNotEmpty()) { "حداقل یک ماده مصرفی وارد کنید" }
+        require(input.materials.all { it.quantity.isFinite() && it.quantity > 0.0 }) { "مقدار مواد مصرفی نامعتبر است" }
+        require(input.materials.map { it.materialId }.distinct().size == input.materials.size) { "هر ماده فقط یک بار قابل ثبت است" }
+        require(input.allocations.isNotEmpty()) { "حداقل یک شرکت مصرف‌کننده انتخاب کنید" }
+        require(input.allocations.all { it.quantity > 0 }) { "تعداد تخصیص شرکت‌ها باید مثبت باشد" }
+        require(input.allocations.map { it.projectId }.distinct().size == input.allocations.size) { "هر شرکت فقط یک بار قابل تخصیص است" }
+        require(input.allocations.sumOf { it.quantity } == input.producedQuantity) {
+            "جمع غذای تخصیص‌یافته باید با تعداد غذای پخته‌شده برابر باشد"
+        }
+        val snapshot = currentSnapshot()
+        val existing = snapshot.cookingBatches.firstOrNull { it.id == input.id }
+        val existingMaterialIds = snapshot.stockTransactions.filter { it.cookingBatchId == input.id }.map { it.materialId }.toSet()
+        val existingProjectIds = snapshot.cookingAllocations.filter { it.batchId == input.id }.map { it.projectId }.toSet()
+        require(input.id == 0L || existing != null) { "ثبت پخت برای ویرایش پیدا نشد" }
+        require(snapshot.warehouses.any { it.id == input.warehouseId && (it.isActive || it.id == existing?.warehouseId) }) { "انبار مصرف معتبر نیست" }
+        require(input.materials.all { item -> snapshot.materials.any { it.id == item.materialId && (it.isActive || it.id in existingMaterialIds) } }) { "ماده مصرفی معتبر نیست" }
+        require(input.allocations.all { allocation -> snapshot.projects.any { it.id == allocation.projectId && (it.status == ProjectStatus.ACTIVE || it.id in existingProjectIds) } }) { "شرکت تخصیص‌یافته فعال نیست" }
+        val now = PersianDateFormatter.nowMillis()
+        val replacementTransactions = input.materials.map { item ->
+            val material = snapshot.materials.first { it.id == item.materialId }
+            StockTransactionEntity(
+                warehouseId = input.warehouseId,
+                materialId = item.materialId,
+                cookingBatchId = input.id.takeIf { it != 0L },
+                type = StockTransactionType.OUT,
+                reason = StockReason.COOKING_USAGE,
+                quantity = item.quantity,
+                unit = material.mainUnit,
+                date = input.date,
+                notes = "مصرف پخت ${input.mealType.name}",
+                createdAt = existing?.createdAt ?: now,
+                updatedAt = now
+            )
+        }
+        InventoryIntegrityValidator.validateNonNegative(
+            snapshot,
+            snapshot.stockTransactions.filterNot { it.cookingBatchId == input.id && input.id != 0L } + replacementTransactions
+        )
+        database.withTransaction {
+            if (input.id != 0L) {
+                dao.deleteStockTransactionsForCookingBatch(input.id)
+                dao.deleteCookingAllocationsForBatch(input.id)
+            }
+            val batchId = dao.insertCookingBatch(
+                CookingBatchEntity(
+                    id = input.id,
+                    warehouseId = input.warehouseId,
+                    date = input.date,
+                    mealType = input.mealType,
+                    producedQuantity = input.producedQuantity,
+                    notes = input.notes?.trim()?.ifBlank { null },
+                    createdAt = existing?.createdAt ?: now,
+                    updatedAt = now
+                )
+            )
+            replacementTransactions.forEach { dao.insertStockTransaction(it.copy(cookingBatchId = batchId)) }
+            input.allocations.forEach { allocation ->
+                dao.insertCookingAllocation(
+                    CookingAllocationEntity(
+                        batchId = batchId,
+                        projectId = allocation.projectId,
+                        quantity = allocation.quantity,
+                        createdAt = existing?.createdAt ?: now,
+                        updatedAt = now
+                    )
+                )
+            }
+            batchId
+        }
+    }
 
     override suspend fun saveWarehouse(entity: WarehouseEntity): Long {
         require(entity.name.isNotBlank()) { "نام انبار الزامی است" }
@@ -519,6 +602,9 @@ class RoomRestaurantRepository(
         entity.bankCardId?.let { cardId ->
             require(snapshot.bankCards.any { it.id == cardId && (it.isActive || it.id == existing?.bankCardId) }) { "کارت بانکی معتبر نیست" }
         }
+        entity.projectId?.let { projectId -> require(snapshot.projects.any { it.id == projectId }) { "شرکت هزینه معتبر نیست" } }
+        entity.cookingBatchId?.let { batchId -> require(snapshot.cookingBatches.any { it.id == batchId }) { "نوبت پخت هزینه معتبر نیست" } }
+        require(entity.projectId == null || entity.cookingBatchId == null) { "هزینه را فقط به شرکت یا یک نوبت پخت متصل کنید" }
         val now = PersianDateFormatter.nowMillis()
         return dao.insertExpense(
             entity.copy(
@@ -543,6 +629,21 @@ class RoomRestaurantRepository(
             }
             dao.deleteMealDelivery(id)
         }
+
+    override suspend fun deleteCookingBatch(id: Long): Result<Unit> = runCatching {
+        val snapshot = currentSnapshot()
+        require(snapshot.cookingBatches.any { it.id == id }) { "ثبت پخت پیدا نشد" }
+        require(snapshot.expenses.none { it.cookingBatchId == id }) { "این پخت هزینه متصل دارد؛ ابتدا هزینه مرتبط را اصلاح یا حذف کنید" }
+        InventoryIntegrityValidator.validateNonNegative(
+            snapshot,
+            snapshot.stockTransactions.filterNot { it.cookingBatchId == id }
+        )
+        database.withTransaction {
+            dao.deleteStockTransactionsForCookingBatch(id)
+            dao.deleteCookingAllocationsForBatch(id)
+            dao.deleteCookingBatch(id)
+        }
+    }
 
     override suspend fun deleteWarehouse(id: Long): Result<Unit> =
         runCatching {
@@ -610,6 +711,7 @@ class RoomRestaurantRepository(
                 ?: dao.getStockTransaction(id)
                 ?: error("تراکنش انبار پیدا نشد")
             require(tx.purchaseId == null) { "تراکنش‌های خودکار خرید را از خود فاکتور خرید اصلاح یا حذف کنید" }
+            require(tx.cookingBatchId == null) { "تراکنش مصرف پخت را از بخش مصرف و پخت اصلاح یا حذف کنید" }
             InventoryIntegrityValidator.validateNonNegative(
                 snapshot = snapshot,
                 transactions = snapshot.stockTransactions.filterNot { it.id == id }
@@ -688,6 +790,8 @@ class RoomRestaurantRepository(
                 dao.insertProjectPayments(snapshot.projectPayments)
                 dao.insertSupplierPayments(snapshot.supplierPayments)
                 dao.insertExpenses(snapshot.expenses)
+                dao.insertCookingBatches(snapshot.cookingBatches)
+                dao.insertCookingAllocations(snapshot.cookingAllocations)
             }
         }
 
@@ -699,6 +803,8 @@ class RoomRestaurantRepository(
     }
 
     private suspend fun clearAll() {
+        dao.clearCookingAllocations()
+        dao.clearCookingBatches()
         dao.clearExpenses()
         dao.clearSupplierPayments()
         dao.clearProjectPayments()
@@ -752,7 +858,7 @@ private fun stockTransactionsReplacingPurchase(
 private object BackupJson {
     fun encode(snapshot: RestaurantSnapshot): String {
         val root = JSONObject()
-        root.put("version", 4)
+        root.put("version", 5)
         root.put("exportedAt", System.currentTimeMillis())
         root.put("projects", snapshot.projects.toJsonArray {
             JSONObject()
@@ -764,6 +870,9 @@ private object BackupJson {
                 .putNullable("phone", it.phone)
                 .put("workerCount", it.workerCount)
                 .put("mealPrice", it.mealPrice)
+                .put("breakfastPrice", it.breakfastPrice)
+                .put("lunchPrice", it.lunchPrice)
+                .put("dinnerPrice", it.dinnerPrice)
                 .put("defaultMealType", it.defaultMealType)
                 .put("startDate", it.startDate)
                 .putNullable("endDate", it.endDate)
@@ -832,6 +941,7 @@ private object BackupJson {
                 .putNullable("projectId", it.projectId)
                 .putNullable("supplierId", it.supplierId)
                 .putNullable("purchaseId", it.purchaseId)
+                .putNullable("cookingBatchId", it.cookingBatchId)
                 .put("type", it.type.name)
                 .put("reason", it.reason.name)
                 .put("quantity", it.quantity)
@@ -917,16 +1027,27 @@ private object BackupJson {
                 .put("amount", it.amount)
                 .put("date", it.date)
                 .putNullable("bankCardId", it.bankCardId)
+                .putNullable("projectId", it.projectId)
+                .putNullable("cookingBatchId", it.cookingBatchId)
                 .putNullable("notes", it.notes)
                 .put("createdAt", it.createdAt)
                 .put("updatedAt", it.updatedAt)
+        })
+        root.put("cookingBatches", snapshot.cookingBatches.toJsonArray {
+            JSONObject().put("id", it.id).put("warehouseId", it.warehouseId).put("date", it.date)
+                .put("mealType", it.mealType.name).put("producedQuantity", it.producedQuantity)
+                .putNullable("notes", it.notes).put("createdAt", it.createdAt).put("updatedAt", it.updatedAt)
+        })
+        root.put("cookingAllocations", snapshot.cookingAllocations.toJsonArray {
+            JSONObject().put("id", it.id).put("batchId", it.batchId).put("projectId", it.projectId)
+                .put("quantity", it.quantity).put("createdAt", it.createdAt).put("updatedAt", it.updatedAt)
         })
         return root.toString(2)
     }
 
     fun decode(json: String): RestaurantSnapshot {
         val root = JSONObject(json)
-        require(root.optInt("version", 0) in 1..4) { "نسخه فایل پشتیبان پشتیبانی نمی‌شود" }
+        require(root.optInt("version", 0) in 1..5) { "نسخه فایل پشتیبان پشتیبانی نمی‌شود" }
         requiredArrays.forEach { name ->
             require(root.optJSONArray(name) != null) { "ساختار فایل پشتیبان ناقص است: $name" }
         }
@@ -941,6 +1062,9 @@ private object BackupJson {
                     phone = optStringOrNull("phone"),
                     workerCount = getInt("workerCount"),
                     mealPrice = getLong("mealPrice"),
+                    breakfastPrice = optLong("breakfastPrice", getLong("mealPrice")),
+                    lunchPrice = optLong("lunchPrice", getLong("mealPrice")),
+                    dinnerPrice = optLong("dinnerPrice", getLong("mealPrice")),
                     defaultMealType = getString("defaultMealType"),
                     startDate = getLong("startDate"),
                     endDate = optLongOrNull("endDate"),
@@ -979,7 +1103,15 @@ private object BackupJson {
                 SupplierEntity(getLong("id"), getString("name"), optStringOrNull("phone"), optStringOrNull("address"), optStringOrNull("notes"), getBoolean("isActive"), getLong("createdAt"), getLong("updatedAt"))
             },
             stockTransactions = root.array("stockTransactions").mapObjects {
-                StockTransactionEntity(getLong("id"), getLong("warehouseId"), getLong("materialId"), optLongOrNull("projectId"), optLongOrNull("supplierId"), optLongOrNull("purchaseId"), StockTransactionType.valueOf(getString("type")), StockReason.valueOf(getString("reason")), getDouble("quantity"), UnitType.valueOf(getString("unit")), optLongOrNull("unitPrice"), optLongOrNull("totalAmount"), getLong("date"), optStringOrNull("notes"), getLong("createdAt"), getLong("updatedAt"))
+                StockTransactionEntity(
+                    id = getLong("id"), warehouseId = getLong("warehouseId"), materialId = getLong("materialId"),
+                    projectId = optLongOrNull("projectId"), supplierId = optLongOrNull("supplierId"),
+                    purchaseId = optLongOrNull("purchaseId"), cookingBatchId = optLongOrNull("cookingBatchId"),
+                    type = StockTransactionType.valueOf(getString("type")), reason = StockReason.valueOf(getString("reason")),
+                    quantity = getDouble("quantity"), unit = UnitType.valueOf(getString("unit")), unitPrice = optLongOrNull("unitPrice"),
+                    totalAmount = optLongOrNull("totalAmount"), date = getLong("date"), notes = optStringOrNull("notes"),
+                    createdAt = getLong("createdAt"), updatedAt = getLong("updatedAt")
+                )
             },
             purchases = root.array("purchases").mapObjects {
                 PurchaseEntity(getLong("id"), optLongOrNull("supplierId"), getLong("warehouseId"), getLong("date"), optStringOrNull("invoiceNumber"), PurchasePaymentType.valueOf(getString("paymentType")), optLongOrNull("bankCardId"), getLong("discountAmount"), getLong("totalAmount"), getLong("paidAmount"), optStringOrNull("notes"), getLong("createdAt"), getLong("updatedAt"))
@@ -1008,8 +1140,19 @@ private object BackupJson {
                 )
             },
             expenses = root.array("expenses").mapObjects {
-                ExpenseEntity(getLong("id"), getString("title"), ExpenseCategory.valueOf(getString("category")), getLong("amount"), getLong("date"), optLongOrNull("bankCardId"), optStringOrNull("notes"), getLong("createdAt"), getLong("updatedAt"))
-            }
+                ExpenseEntity(
+                    id = getLong("id"), title = getString("title"), category = ExpenseCategory.valueOf(getString("category")),
+                    amount = getLong("amount"), date = getLong("date"), bankCardId = optLongOrNull("bankCardId"),
+                    projectId = optLongOrNull("projectId"), cookingBatchId = optLongOrNull("cookingBatchId"),
+                    notes = optStringOrNull("notes"), createdAt = getLong("createdAt"), updatedAt = getLong("updatedAt")
+                )
+            },
+            cookingBatches = root.optJSONArray("cookingBatches")?.mapObjects {
+                CookingBatchEntity(getLong("id"), getLong("warehouseId"), getLong("date"), MealType.valueOf(getString("mealType")), getInt("producedQuantity"), optStringOrNull("notes"), getLong("createdAt"), getLong("updatedAt"))
+            }.orEmpty(),
+            cookingAllocations = root.optJSONArray("cookingAllocations")?.mapObjects {
+                CookingAllocationEntity(getLong("id"), getLong("batchId"), getLong("projectId"), getInt("quantity"), getLong("createdAt"), getLong("updatedAt"))
+            }.orEmpty()
         )
     }
 
@@ -1020,8 +1163,9 @@ private object BackupJson {
         val supplierIds = snapshot.suppliers.map { it.id }.toSet()
         val purchaseIds = snapshot.purchases.map { it.id }.toSet()
         val bankCardIds = snapshot.bankCards.map { it.id }.toSet()
+        val cookingBatchIds = snapshot.cookingBatches.map { it.id }.toSet()
 
-        require(snapshot.projects.all { it.id > 0 && it.name.isNotBlank() && it.workerCount > 0 && it.mealPrice > 0 }) {
+        require(snapshot.projects.all { it.id > 0 && it.name.isNotBlank() && it.workerCount > 0 && it.mealPrice > 0 && it.breakfastPrice > 0 && it.lunchPrice > 0 && it.dinnerPrice > 0 }) {
             "فایل پشتیبان پروژه نامعتبر دارد"
         }
         require(snapshot.warehouses.all { it.id > 0 && it.name.isNotBlank() }) {
@@ -1082,6 +1226,7 @@ private object BackupJson {
                 (it.projectId == null || it.projectId in projectIds) &&
                 (it.supplierId == null || it.supplierId in supplierIds) &&
                 (it.purchaseId == null || it.purchaseId in purchaseIds) &&
+                (it.cookingBatchId == null || it.cookingBatchId in cookingBatchIds) &&
                 it.quantity.isFinite() && it.quantity != 0.0
         }) {
             "فایل پشتیبان تراکنش انبار نامعتبر دارد"
@@ -1092,6 +1237,19 @@ private object BackupJson {
             "فایل پشتیبان مقدار تراکنش انبار نامعتبر دارد"
         }
         InventoryIntegrityValidator.validateNonNegative(snapshot, snapshot.stockTransactions)
+        require(snapshot.cookingBatches.all { it.id > 0 && it.warehouseId in warehouseIds && it.producedQuantity > 0 }) {
+            "فایل پشتیبان ثبت پخت نامعتبر دارد"
+        }
+        require(snapshot.cookingAllocations.all { it.id > 0 && it.batchId in cookingBatchIds && it.projectId in projectIds && it.quantity > 0 }) {
+            "فایل پشتیبان تخصیص پخت نامعتبر دارد"
+        }
+        val allocationsByBatch = snapshot.cookingAllocations.groupBy { it.batchId }
+        require(snapshot.cookingBatches.all { batch -> allocationsByBatch[batch.id].orEmpty().sumOf { it.quantity } == batch.producedQuantity }) {
+            "جمع تخصیص پخت در فایل پشتیبان نامعتبر است"
+        }
+        require(snapshot.cookingBatches.all { batch -> snapshot.stockTransactions.any { it.cookingBatchId == batch.id && it.reason == StockReason.COOKING_USAGE } }) {
+            "مواد مصرفی ثبت پخت در فایل پشتیبان ناقص است"
+        }
         require(snapshot.projectPayments.all {
             it.projectId in projectIds && (it.bankCardId == null || it.bankCardId in bankCardIds) && it.amount > 0
         }) {
@@ -1107,7 +1265,10 @@ private object BackupJson {
             "فایل پشتیبان پرداخت تامین‌کننده نامعتبر دارد"
         }
         require(snapshot.expenses.all {
-            (it.bankCardId == null || it.bankCardId in bankCardIds) && it.title.isNotBlank() && it.amount > 0
+            (it.bankCardId == null || it.bankCardId in bankCardIds) &&
+                (it.projectId == null || it.projectId in projectIds) &&
+                (it.cookingBatchId == null || it.cookingBatchId in cookingBatchIds) &&
+                (it.projectId == null || it.cookingBatchId == null) && it.title.isNotBlank() && it.amount > 0
         }) {
             "فایل پشتیبان هزینه نامعتبر دارد"
         }

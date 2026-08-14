@@ -1,6 +1,8 @@
 package com.restaurant.offlinemanager.domain.model
 
 import com.restaurant.offlinemanager.data.local.entity.BankCardEntity
+import com.restaurant.offlinemanager.data.local.entity.CookingAllocationEntity
+import com.restaurant.offlinemanager.data.local.entity.CookingBatchEntity
 import com.restaurant.offlinemanager.data.local.entity.ExpenseEntity
 import com.restaurant.offlinemanager.data.local.entity.MaterialEntity
 import com.restaurant.offlinemanager.data.local.entity.MealDeliveryEntity
@@ -30,7 +32,9 @@ data class RestaurantSnapshot(
     val bankCards: List<BankCardEntity> = emptyList(),
     val projectPayments: List<ProjectPaymentEntity> = emptyList(),
     val supplierPayments: List<SupplierPaymentEntity> = emptyList(),
-    val expenses: List<ExpenseEntity> = emptyList()
+    val expenses: List<ExpenseEntity> = emptyList(),
+    val cookingBatches: List<CookingBatchEntity> = emptyList(),
+    val cookingAllocations: List<CookingAllocationEntity> = emptyList()
 )
 
 data class DashboardStats(
@@ -106,6 +110,8 @@ data class ProjectProfit(
     val earnedRevenue: Long,
     val materialCost: Long,
     val grossProfit: Long,
+    val operatingCost: Long,
+    val netProfit: Long,
     val marginPercent: Double
 )
 
@@ -118,11 +124,41 @@ data class ProjectInput(
     val phone: String?,
     val workerCount: Int,
     val mealPrice: Long,
+    val breakfastPrice: Long,
+    val lunchPrice: Long,
+    val dinnerPrice: Long,
     val defaultMealType: String,
     val startDate: Long,
     val endDate: Long?,
     val status: com.restaurant.offlinemanager.data.local.entity.ProjectStatus,
     val notes: String?
+)
+
+data class CookingMaterialInput(
+    val materialId: Long,
+    val quantity: Double
+)
+
+data class CookingAllocationInput(
+    val projectId: Long,
+    val quantity: Int
+)
+
+data class CookingBatchInput(
+    val id: Long = 0,
+    val warehouseId: Long,
+    val date: Long,
+    val mealType: com.restaurant.offlinemanager.data.local.entity.MealType,
+    val producedQuantity: Int,
+    val materials: List<CookingMaterialInput>,
+    val allocations: List<CookingAllocationInput>,
+    val notes: String?
+)
+
+data class CookingBatchCost(
+    val batchId: Long,
+    val totalCost: Long,
+    val costPerMeal: Long
 )
 
 data class MealDeliveryInput(

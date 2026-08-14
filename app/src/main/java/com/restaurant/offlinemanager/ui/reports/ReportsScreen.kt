@@ -141,7 +141,7 @@ fun ReportsScreen(
             ReportCard(
                 title = "سودآورترین پروژه",
                 subtitle = mostProfitableProject?.let {
-                    "${it.project.name} • سود ${MoneyFormatter.format(it.grossProfit)} • حاشیه ${NumberFormatter.format(it.marginPercent)}٪"
+                    "${it.project.name} • سود خالص ${MoneyFormatter.format(it.netProfit)} • هزینه عملیاتی ${MoneyFormatter.format(it.operatingCost)} • حاشیه ${NumberFormatter.format(it.marginPercent)}٪"
                 } ?: "برای محاسبه سود پروژه، خروج مواد را به پروژه مربوط متصل کنید.",
                 icon = Icons.Outlined.BarChart,
                 accent = AppGreen
@@ -171,6 +171,8 @@ fun ReportsScreen(
                 accent = AppOrange
             )
         }
+        item { GoldPrimaryButton("خروجی پخت و مصرف", onClick = { onExport(context, CsvReportType.COOKING) }, icon = Icons.Outlined.FileDownload) }
+        item { GoldPrimaryButton("خروجی سود وعده‌ها", onClick = { onExport(context, CsvReportType.MEAL_PROFIT) }, icon = Icons.Outlined.FileDownload) }
         item { GoldPrimaryButton("خروجی تحویل غذا", onClick = { onExport(context, CsvReportType.MEAL_DELIVERIES) }, icon = Icons.Outlined.FileDownload) }
         item { GoldPrimaryButton("خروجی خریدها", onClick = { onExport(context, CsvReportType.PURCHASES) }, icon = Icons.Outlined.FileDownload) }
         item { GoldPrimaryButton("خروجی موجودی", onClick = { onExport(context, CsvReportType.INVENTORY) }, icon = Icons.Outlined.FileDownload) }

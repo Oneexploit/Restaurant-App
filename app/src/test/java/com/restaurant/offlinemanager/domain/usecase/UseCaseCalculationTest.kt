@@ -3,6 +3,8 @@ package com.restaurant.offlinemanager.domain.usecase
 import android.content.Context
 import android.net.Uri
 import com.restaurant.offlinemanager.data.local.entity.BankCardEntity
+import com.restaurant.offlinemanager.data.local.entity.CookingAllocationEntity
+import com.restaurant.offlinemanager.data.local.entity.CookingBatchEntity
 import com.restaurant.offlinemanager.data.local.entity.ExpenseCategory
 import com.restaurant.offlinemanager.data.local.entity.ExpenseEntity
 import com.restaurant.offlinemanager.data.local.entity.DeliveryStatus
@@ -25,6 +27,7 @@ import com.restaurant.offlinemanager.data.local.entity.UnitType
 import com.restaurant.offlinemanager.data.local.entity.WarehouseEntity
 import com.restaurant.offlinemanager.data.local.entity.WarehouseType
 import com.restaurant.offlinemanager.domain.model.MealDeliveryInput
+import com.restaurant.offlinemanager.domain.model.CookingBatchInput
 import com.restaurant.offlinemanager.domain.model.ProjectInput
 import com.restaurant.offlinemanager.domain.model.ProjectPaymentInput
 import com.restaurant.offlinemanager.domain.model.PurchaseItemInput
@@ -191,6 +194,36 @@ class UseCaseCalculationTest {
         assertEquals(90, result.averageUnitCost)
         assertEquals(90, result.approximateValue)
         assertEquals(90, inventory.costOfGoodsConsumed(snapshot))
+    }
+
+    @Test
+    fun cookingCostIsAllocatedBetweenCompaniesByMealQuantity() {
+        val warehouse = warehouse()
+        val material = material()
+        val firstProject = project(1)
+        val secondProject = project(2)
+        val batch = CookingBatchEntity(10, warehouse.id, now + 1, MealType.LUNCH, 4, createdAt = now + 1, updatedAt = now + 1)
+        val snapshot = RestaurantSnapshot(
+            projects = listOf(firstProject, secondProject), warehouses = listOf(warehouse), materials = listOf(material),
+            cookingBatches = listOf(batch),
+            cookingAllocations = listOf(
+                CookingAllocationEntity(1, batch.id, firstProject.id, 1, now, now),
+                CookingAllocationEntity(2, batch.id, secondProject.id, 3, now, now)
+            ),
+            stockTransactions = listOf(
+                stock(warehouse.id, material.id, StockTransactionType.IN, 10.0).copy(id = 1, unitPrice = 100, date = now, createdAt = now),
+                stock(warehouse.id, material.id, StockTransactionType.OUT, 4.0).copy(id = 2, cookingBatchId = batch.id, reason = StockReason.COOKING_USAGE, date = now + 1, createdAt = now + 1)
+            )
+        )
+
+        val inventory = InventoryUseCase(FakeRepository(snapshot))
+        val costs = inventory.projectMaterialCosts(snapshot)
+        val batchCost = inventory.cookingBatchCosts(snapshot).single()
+
+        assertEquals(100L, costs[firstProject.id])
+        assertEquals(300L, costs[secondProject.id])
+        assertEquals(400L, batchCost.totalCost)
+        assertEquals(100L, batchCost.costPerMeal)
     }
 
     @Test
@@ -381,7 +414,12 @@ class UseCaseCalculationTest {
     }
 
     private fun project(id: Long = 1): ProjectEntity =
-        ProjectEntity(id, "پروژه تست", null, null, null, null, 10, 100, "ناهار", now, null, ProjectStatus.ACTIVE, null, now, now)
+        ProjectEntity(
+            id = id, name = "پروژه تست", workerCount = 10, mealPrice = 100,
+            breakfastPrice = 100, lunchPrice = 100, dinnerPrice = 100,
+            defaultMealType = "ناهار", startDate = now, status = ProjectStatus.ACTIVE,
+            createdAt = now, updatedAt = now
+        )
 
     private fun meal(projectId: Long, total: Long): MealDeliveryEntity =
         MealDeliveryEntity(id = total, projectId = projectId, date = now, mealType = MealType.LUNCH, quantity = 1, unitPrice = total, totalAmount = total, createdAt = now, updatedAt = now)
@@ -423,6 +461,7 @@ private class FakeRepository(private val snapshot: RestaurantSnapshot) : Restaur
     override suspend fun saveProject(input: ProjectInput): Long = unsupported()
     override suspend fun archiveProject(projectId: Long): Result<Unit> = unsupported()
     override suspend fun saveMealDelivery(input: MealDeliveryInput): Result<Long> = unsupported()
+    override suspend fun saveCookingBatch(input: CookingBatchInput): Result<Long> = unsupported()
     override suspend fun saveWarehouse(entity: WarehouseEntity): Long = unsupported()
     override suspend fun saveMaterial(entity: MaterialEntity): Long = unsupported()
     override suspend fun saveSupplier(entity: SupplierEntity): Long = unsupported()
@@ -434,6 +473,7 @@ private class FakeRepository(private val snapshot: RestaurantSnapshot) : Restaur
     override suspend fun saveSupplierPayment(input: SupplierPaymentInput): Result<Long> = unsupported()
     override suspend fun saveExpense(entity: ExpenseEntity): Long = unsupported()
     override suspend fun deleteMealDelivery(id: Long): Result<Unit> = unsupported()
+    override suspend fun deleteCookingBatch(id: Long): Result<Unit> = unsupported()
     override suspend fun deleteWarehouse(id: Long): Result<Unit> = unsupported()
     override suspend fun deleteMaterial(id: Long): Result<Unit> = unsupported()
     override suspend fun deleteSupplier(id: Long): Result<Unit> = unsupported()

@@ -74,6 +74,7 @@ import com.restaurant.offlinemanager.core.design.TextMuted
 import com.restaurant.offlinemanager.core.design.TextPrimary
 import com.restaurant.offlinemanager.core.design.TextSecondary
 import com.restaurant.offlinemanager.core.utils.MoneyFormatter
+import com.restaurant.offlinemanager.core.utils.NumberFormatter
 import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
 import com.restaurant.offlinemanager.data.local.entity.BankCardEntity
 import com.restaurant.offlinemanager.data.local.entity.ExpenseCategory
@@ -814,10 +815,14 @@ fun ExpenseFormScreen(
 ) {
     val editing = state.snapshot.expenses.firstOrNull { it.id == expenseId }
     val cards = state.snapshot.bankCards.filter { it.isActive || it.id == editing?.bankCardId }
+    val projects = state.snapshot.projects
+    val cookingBatches = state.snapshot.cookingBatches
     var title by remember(editing?.id) { mutableStateOf(editing?.title.orEmpty()) }
     var category by remember(editing?.id) { mutableStateOf(editing?.category ?: ExpenseCategory.OTHER) }
     var amount by remember(editing?.id) { mutableStateOf(editing?.amount?.toString().orEmpty()) }
     var card by remember(editing?.id, cards) { mutableStateOf<BankCardEntity?>(cards.firstOrNull { it.id == editing?.bankCardId }) }
+    var project by remember(editing?.id) { mutableStateOf(projects.firstOrNull { it.id == editing?.projectId }) }
+    var cookingBatch by remember(editing?.id) { mutableStateOf(cookingBatches.firstOrNull { it.id == editing?.cookingBatchId }) }
     var date by remember(editing?.id) { mutableLongStateOf(editing?.date ?: PersianDateFormatter.todayStartMillis()) }
     var notes by remember(editing?.id) { mutableStateOf(editing?.notes.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -846,6 +851,23 @@ fun ExpenseFormScreen(
                     onClear = { card = null }
                 ) { card = it }
                 Spacer(Modifier.height(10.dp))
+                OptionSelector(
+                    "تخصیص مستقیم به شرکت (اختیاری)", projects, project, { it.name },
+                    clearLabel = "هزینه عمومی", onClear = { project = null }
+                ) {
+                    project = it
+                    cookingBatch = null
+                }
+                Spacer(Modifier.height(10.dp))
+                OptionSelector(
+                    "تخصیص به نوبت پخت (اختیاری)", cookingBatches, cookingBatch,
+                    { "${it.mealType.label()} • ${PersianDateFormatter.format(it.date)} • ${NumberFormatter.format(it.producedQuantity)} پرس" },
+                    clearLabel = "بدون نوبت پخت", onClear = { cookingBatch = null }
+                ) {
+                    cookingBatch = it
+                    project = null
+                }
+                Spacer(Modifier.height(10.dp))
                 LocalDateSelector("تاریخ", date, { date = it })
                 Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(notes, { notes = it }, "توضیحات", singleLine = false)
@@ -869,6 +891,8 @@ fun ExpenseFormScreen(
                             amount = value,
                             date = date,
                             bankCardId = card?.id,
+                            projectId = project?.id,
+                            cookingBatchId = cookingBatch?.id,
                             notes = notes,
                             createdAt = editing?.createdAt ?: now,
                             updatedAt = now

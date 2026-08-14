@@ -239,7 +239,9 @@ fun ProjectFormScreen(
     var manager by remember(editing?.id) { mutableStateOf(editing?.managerName.orEmpty()) }
     var phone by remember(editing?.id) { mutableStateOf(editing?.phone.orEmpty()) }
     var workers by remember(editing?.id) { mutableStateOf(editing?.workerCount?.toString().orEmpty()) }
-    var mealPrice by remember(editing?.id) { mutableStateOf(editing?.mealPrice?.toString().orEmpty()) }
+    var breakfastPrice by remember(editing?.id) { mutableStateOf(editing?.breakfastPrice?.takeIf { it > 0 }?.toString() ?: editing?.mealPrice?.toString().orEmpty()) }
+    var lunchPrice by remember(editing?.id) { mutableStateOf(editing?.lunchPrice?.takeIf { it > 0 }?.toString() ?: editing?.mealPrice?.toString().orEmpty()) }
+    var dinnerPrice by remember(editing?.id) { mutableStateOf(editing?.dinnerPrice?.takeIf { it > 0 }?.toString() ?: editing?.mealPrice?.toString().orEmpty()) }
     var defaultMeal by remember(editing?.id) { mutableStateOf(editing?.defaultMealType ?: "ناهار") }
     var status by remember(editing?.id) { mutableStateOf(editing?.status ?: ProjectStatus.ACTIVE) }
     var startDate by remember(editing?.id) { mutableLongStateOf(editing?.startDate ?: PersianDateFormatter.todayStartMillis()) }
@@ -253,15 +255,15 @@ fun ProjectFormScreen(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { SectionHeader(if (editing == null) "افزودن پروژه" else "ویرایش پروژه") }
-        item { SectionHeader("اطلاعات پروژه") }
+        item { SectionHeader(if (editing == null) "افزودن شرکت و قرارداد" else "ویرایش قرارداد") }
+        item { SectionHeader("اطلاعات شرکت") }
         item {
             GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
-                DarkOutlinedTextField(name, { name = it }, "نام پروژه")
+                DarkOutlinedTextField(name, { name = it }, "عنوان قرارداد")
                 Spacer(Modifier.height(10.dp))
                 DarkOutlinedTextField(company, { company = it }, "نام شرکت/کارفرما")
                 Spacer(Modifier.height(10.dp))
-                DarkOutlinedTextField(address, { address = it }, "آدرس پروژه", singleLine = false)
+                DarkOutlinedTextField(address, { address = it }, "آدرس شرکت", singleLine = false)
             }
         }
         item { SectionHeader("اطلاعات تماس") }
@@ -277,7 +279,12 @@ fun ProjectFormScreen(
             GlassCard(Modifier.fillMaxWidth(), accent = AppPurple) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     DarkOutlinedTextField(workers, { workers = it }, "تعداد نفرات", modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
-                    MoneyField(mealPrice, { mealPrice = it }, "قیمت هر وعده", modifier = Modifier.weight(1f))
+                    MoneyField(lunchPrice, { lunchPrice = it }, "قیمت ناهار", modifier = Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    MoneyField(breakfastPrice, { breakfastPrice = it }, "قیمت صبحانه", modifier = Modifier.weight(1f))
+                    MoneyField(dinnerPrice, { dinnerPrice = it }, "قیمت شام", modifier = Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(10.dp))
                 OptionSelector("نوع وعده پیش‌فرض", listOf("صبحانه", "ناهار", "شام"), defaultMeal, { it }) { defaultMeal = it }
@@ -315,7 +322,11 @@ fun ProjectFormScreen(
         }
         item {
             val workerCount = NumberFormatter.normalizeDigits(workers).toIntOrNull() ?: 0
-            val price = MoneyFormatter.parse(mealPrice)
+            val price = when (defaultMeal) {
+                "صبحانه" -> MoneyFormatter.parse(breakfastPrice)
+                "شام" -> MoneyFormatter.parse(dinnerPrice)
+                else -> MoneyFormatter.parse(lunchPrice)
+            }
             GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
                 Text("پیش‌نمایش قرارداد", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(8.dp))
@@ -332,11 +343,13 @@ fun ProjectFormScreen(
                 icon = Icons.Outlined.Save,
                 onClick = {
                     val workerCount = NumberFormatter.normalizeDigits(workers).toIntOrNull() ?: 0
-                    val price = MoneyFormatter.parse(mealPrice)
+                    val breakfast = MoneyFormatter.parse(breakfastPrice)
+                    val lunch = MoneyFormatter.parse(lunchPrice)
+                    val dinner = MoneyFormatter.parse(dinnerPrice)
                     error = when {
-                        name.isBlank() -> "نام پروژه الزامی است"
+                        name.isBlank() -> "عنوان قرارداد الزامی است"
                         workerCount <= 0 -> "تعداد نفرات باید بیشتر از صفر باشد"
-                        price <= 0 -> "قیمت هر وعده باید بیشتر از صفر باشد"
+                        breakfast <= 0 || lunch <= 0 || dinner <= 0 -> "قیمت هر سه وعده باید بیشتر از صفر باشد"
                         endDate != null && endDate!! < startDate -> "تاریخ پایان نمی‌تواند قبل از تاریخ شروع باشد"
                         else -> null
                     }
@@ -350,7 +363,10 @@ fun ProjectFormScreen(
                                 managerName = manager,
                                 phone = phone,
                                 workerCount = workerCount,
-                                mealPrice = price,
+                                mealPrice = lunch,
+                                breakfastPrice = breakfast,
+                                lunchPrice = lunch,
+                                dinnerPrice = dinner,
                                 defaultMealType = defaultMeal,
                                 startDate = startDate,
                                 endDate = endDate,

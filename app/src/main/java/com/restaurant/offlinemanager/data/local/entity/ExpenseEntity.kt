@@ -6,7 +6,7 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "expenses",
-    indices = [Index("bankCardId"), Index("date")]
+    indices = [Index("bankCardId"), Index("projectId"), Index("cookingBatchId"), Index("date")]
 )
 data class ExpenseEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -15,6 +15,8 @@ data class ExpenseEntity(
     val amount: Long,
     val date: Long,
     val bankCardId: Long? = null,
+    val projectId: Long? = null,
+    val cookingBatchId: Long? = null,
     val notes: String? = null,
     val createdAt: Long,
     val updatedAt: Long

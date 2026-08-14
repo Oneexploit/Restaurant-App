@@ -48,5 +48,46 @@ object DatabaseMigrations {
         }
     }
 
-    val all = arrayOf(migration1To2, migration2To3, migration3To4)
+    val migration4To5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE projects ADD COLUMN breakfastPrice INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE projects ADD COLUMN lunchPrice INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE projects ADD COLUMN dinnerPrice INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("UPDATE projects SET breakfastPrice = mealPrice, lunchPrice = mealPrice, dinnerPrice = mealPrice")
+            db.execSQL("ALTER TABLE stock_transactions ADD COLUMN cookingBatchId INTEGER")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_stock_transactions_cookingBatchId ON stock_transactions(cookingBatchId)")
+            db.execSQL("ALTER TABLE expenses ADD COLUMN projectId INTEGER")
+            db.execSQL("ALTER TABLE expenses ADD COLUMN cookingBatchId INTEGER")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_expenses_projectId ON expenses(projectId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_expenses_cookingBatchId ON expenses(cookingBatchId)")
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS cooking_batches (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    warehouseId INTEGER NOT NULL,
+                    date INTEGER NOT NULL,
+                    mealType TEXT NOT NULL,
+                    producedQuantity INTEGER NOT NULL,
+                    notes TEXT,
+                    createdAt INTEGER NOT NULL,
+                    updatedAt INTEGER NOT NULL
+                )""".trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_cooking_batches_warehouseId ON cooking_batches(warehouseId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_cooking_batches_date ON cooking_batches(date)")
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS cooking_allocations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    batchId INTEGER NOT NULL,
+                    projectId INTEGER NOT NULL,
+                    quantity INTEGER NOT NULL,
+                    createdAt INTEGER NOT NULL,
+                    updatedAt INTEGER NOT NULL
+                )""".trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_cooking_allocations_batchId ON cooking_allocations(batchId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_cooking_allocations_projectId ON cooking_allocations(projectId)")
+        }
+    }
+
+    val all = arrayOf(migration1To2, migration2To3, migration3To4, migration4To5)
 }

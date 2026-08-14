@@ -5,6 +5,8 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.restaurant.offlinemanager.data.local.dao.RestaurantDao
 import com.restaurant.offlinemanager.data.local.entity.BankCardEntity
+import com.restaurant.offlinemanager.data.local.entity.CookingAllocationEntity
+import com.restaurant.offlinemanager.data.local.entity.CookingBatchEntity
 import com.restaurant.offlinemanager.data.local.entity.ExpenseEntity
 import com.restaurant.offlinemanager.data.local.entity.MaterialEntity
 import com.restaurant.offlinemanager.data.local.entity.MealDeliveryEntity
@@ -30,9 +32,11 @@ import com.restaurant.offlinemanager.data.local.entity.WarehouseEntity
         BankCardEntity::class,
         ProjectPaymentEntity::class,
         SupplierPaymentEntity::class,
-        ExpenseEntity::class
+        ExpenseEntity::class,
+        CookingBatchEntity::class,
+        CookingAllocationEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(DatabaseConverters::class)

@@ -16,6 +16,8 @@ import com.restaurant.offlinemanager.data.local.entity.WarehouseEntity
 import com.restaurant.offlinemanager.data.repository.AppSettings
 import com.restaurant.offlinemanager.data.repository.AppSettingsRepository
 import com.restaurant.offlinemanager.domain.model.BankCardBalance
+import com.restaurant.offlinemanager.domain.model.CookingBatchCost
+import com.restaurant.offlinemanager.domain.model.CookingBatchInput
 import com.restaurant.offlinemanager.domain.model.AccountingSummary
 import com.restaurant.offlinemanager.domain.model.DashboardStats
 import com.restaurant.offlinemanager.domain.model.InventoryItem
@@ -57,10 +59,13 @@ data class AppUiState(
     val bankBalances: List<BankCardBalance> = emptyList(),
     val accounting: AccountingSummary = AccountingSummary(),
     val projectProfits: List<ProjectProfit> = emptyList(),
-    val monthlyPoints: List<MonthlyPoint> = emptyList()
+    val monthlyPoints: List<MonthlyPoint> = emptyList(),
+    val cookingBatchCosts: List<CookingBatchCost> = emptyList()
 )
 
 enum class CsvReportType(val filePrefix: String, val successLabel: String) {
+    COOKING("cooking-consumption", "گزارش پخت و مصرف"),
+    MEAL_PROFIT("meal-profit", "گزارش سود وعده‌ها"),
     MEAL_DELIVERIES("meal-deliveries", "گزارش تحویل غذا"),
     PURCHASES("purchases", "گزارش خریدها"),
     INVENTORY("inventory", "گزارش موجودی"),
@@ -107,7 +112,8 @@ class RestaurantViewModel(
             bankBalances = useCases.bankCards.calculateBalances(snapshot),
             accounting = useCases.accounting.summary(snapshot),
             projectProfits = useCases.accounting.projectProfits(snapshot),
-            monthlyPoints = useCases.reports.monthlySummary(snapshot)
+            monthlyPoints = useCases.reports.monthlySummary(snapshot),
+            cookingBatchCosts = useCases.inventory.cookingBatchCosts(snapshot)
         )
     } catch (error: Throwable) {
         if (error is CancellationException) throw error
@@ -129,6 +135,10 @@ class RestaurantViewModel(
 
     fun saveMealDelivery(input: MealDeliveryInput, onSuccess: () -> Unit = {}) = ioAction("تحویل غذا ثبت شد", onSuccess) {
         repository.saveMealDelivery(input).getOrThrow()
+    }
+
+    fun saveCookingBatch(input: CookingBatchInput, onSuccess: () -> Unit = {}) = ioAction("پخت و مصرف ثبت شد", onSuccess) {
+        repository.saveCookingBatch(input).getOrThrow()
     }
 
     fun saveWarehouse(entity: WarehouseEntity, onSuccess: () -> Unit = {}) = ioAction("انبار ذخیره شد", onSuccess) {
@@ -207,6 +217,8 @@ class RestaurantViewModel(
     fun exportCsv(context: Context, type: CsvReportType) = ioAction("${type.successLabel} ذخیره شد") {
         val snapshot = repository.currentSnapshot()
         val csv = when (type) {
+            CsvReportType.COOKING -> useCases.reports.cookingCsv(snapshot)
+            CsvReportType.MEAL_PROFIT -> useCases.reports.mealProfitCsv(snapshot)
             CsvReportType.MEAL_DELIVERIES -> useCases.reports.mealDeliveriesCsv(snapshot)
             CsvReportType.PURCHASES -> useCases.reports.purchasesCsv(snapshot)
             CsvReportType.INVENTORY -> useCases.reports.inventoryCsv(snapshot)
@@ -225,6 +237,10 @@ class RestaurantViewModel(
 
     fun deleteMealDelivery(id: Long) = ioAction("تحویل غذا حذف شد") {
         repository.deleteMealDelivery(id).getOrThrow()
+    }
+
+    fun deleteCookingBatch(id: Long) = ioAction("ثبت پخت حذف شد") {
+        repository.deleteCookingBatch(id).getOrThrow()
     }
 
     fun deleteWarehouse(id: Long) = ioAction("انبار حذف یا غیرفعال شد") {

@@ -4,6 +4,7 @@ import com.restaurant.offlinemanager.data.local.entity.StockTransactionEntity
 import com.restaurant.offlinemanager.data.local.entity.StockTransactionType
 import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
 import com.restaurant.offlinemanager.domain.model.InventoryItem
+import com.restaurant.offlinemanager.domain.model.CookingBatchCost
 import com.restaurant.offlinemanager.domain.model.RestaurantSnapshot
 import com.restaurant.offlinemanager.domain.repository.RestaurantRepository
 import kotlinx.coroutines.flow.Flow
@@ -52,6 +53,14 @@ class InventoryUseCase(private val repository: RestaurantRepository) {
     fun projectMaterialCosts(snapshot: RestaurantSnapshot): Map<Long, Long> =
         calculateValuation(snapshot).projectCosts.mapValues { it.value.roundToLong() }
 
+    fun cookingBatchCosts(snapshot: RestaurantSnapshot): List<CookingBatchCost> {
+        val valuation = calculateValuation(snapshot)
+        return snapshot.cookingBatches.map { batch ->
+            val total = (valuation.batchCosts[batch.id] ?: 0.0).roundToLong()
+            CookingBatchCost(batch.id, total, if (batch.producedQuantity > 0) total / batch.producedQuantity else 0)
+        }
+    }
+
     fun availableStock(snapshot: RestaurantSnapshot, warehouseId: Long, materialId: Long): Double =
         calculateInventory(snapshot)
             .firstOrNull { it.warehouseId == warehouseId && it.materialId == materialId }
@@ -60,6 +69,7 @@ class InventoryUseCase(private val repository: RestaurantRepository) {
     private fun calculateValuation(snapshot: RestaurantSnapshot): ValuationResult {
         val balances = mutableMapOf<Pair<Long, Long>, CostBalance>()
         val projectCosts = mutableMapOf<Long, Double>()
+        val batchCosts = mutableMapOf<Long, Double>()
         val pendingTransfers = mutableMapOf<Long, ArrayDeque<Double>>()
         var consumed = 0.0
         var waste = 0.0
@@ -95,6 +105,9 @@ class InventoryUseCase(private val repository: RestaurantRepository) {
                         transaction.projectId?.let { projectId ->
                             projectCosts[projectId] = (projectCosts[projectId] ?: 0.0) + cost
                         }
+                        transaction.cookingBatchId?.let { batchId ->
+                            batchCosts[batchId] = (batchCosts[batchId] ?: 0.0) + cost
+                        }
                     }
                     StockTransactionType.TRANSFER_OUT -> {
                         val averageCost = balance.averageCost
@@ -116,7 +129,15 @@ class InventoryUseCase(private val repository: RestaurantRepository) {
                     }
                 }
             }
-        return ValuationResult(balances, projectCosts, consumed, waste, monthlyConsumed, monthlyWaste)
+        snapshot.cookingAllocations.groupBy { it.batchId }.forEach { (batchId, allocations) ->
+            val batchCost = batchCosts[batchId] ?: 0.0
+            val totalQuantity = allocations.sumOf { it.quantity }
+            if (batchCost > 0.0 && totalQuantity > 0) allocations.forEach { allocation ->
+                val allocatedCost = batchCost * allocation.quantity / totalQuantity
+                projectCosts[allocation.projectId] = (projectCosts[allocation.projectId] ?: 0.0) + allocatedCost
+            }
+        }
+        return ValuationResult(balances, projectCosts, batchCosts, consumed, waste, monthlyConsumed, monthlyWaste)
     }
 
     private fun effectivePurchaseUnitCosts(snapshot: RestaurantSnapshot): Map<Pair<Long?, Long>, Double> {
@@ -159,6 +180,7 @@ class InventoryUseCase(private val repository: RestaurantRepository) {
     private data class ValuationResult(
         val balances: Map<Pair<Long, Long>, CostBalance>,
         val projectCosts: Map<Long, Double>,
+        val batchCosts: Map<Long, Double>,
         val costOfGoodsConsumed: Double,
         val wasteLoss: Double,
         val monthlyConsumed: Map<String, Double>,

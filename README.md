@@ -62,6 +62,9 @@ Back up `release-key.jks` and its passwords securely. Losing this signing key ma
 - Bank card balance calculation from initial balance, received project payments, card purchases, supplier payments, and expenses.
 - Multi-item daily purchase invoices with automatic stock-in transactions.
 - Edit support for meal deliveries, purchase invoices, project receipts, supplier payments, and expenses.
+- Atomic cooking and consumption batches with material usage, company allocation, cost per meal, and shared-cost allocation.
+- Separate breakfast, lunch, and dinner contract prices.
+- Optional project or cooking-batch allocation for operating expenses and net project profitability.
 - Stock in, stock out, transfer, waste, and adjustment forms.
 - Local CSV export for purchases, inventory, receivables, supplier debts, payments, profit/loss, project profit, and cash flow.
 - Local JSON backup and guarded restore for all Room tables, including structure validation and an automatic pre-restore backup.
@@ -69,7 +72,7 @@ Back up `release-key.jks` and its passwords securely. Losing this signing key ma
 
 ## Database Overview
 
-Room database version: `4`
+Room database version: `5`
 
 Main tables:
 
@@ -85,6 +88,8 @@ Main tables:
 - `project_payments`
 - `supplier_payments`
 - `expenses`
+- `cooking_batches`
+- `cooking_allocations`
 
 Settings are stored in DataStore, not Room.
 
