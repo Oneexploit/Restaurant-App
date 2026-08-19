@@ -58,6 +58,8 @@ data class AppUiState(
     val supplierDebts: List<SupplierDebt> = emptyList(),
     val bankBalances: List<BankCardBalance> = emptyList(),
     val accounting: AccountingSummary = AccountingSummary(),
+    val dailyAccounting: AccountingSummary = AccountingSummary(),
+    val monthlyAccounting: AccountingSummary = AccountingSummary(),
     val projectProfits: List<ProjectProfit> = emptyList(),
     val monthlyPoints: List<MonthlyPoint> = emptyList(),
     val cookingBatchCosts: List<CookingBatchCost> = emptyList()
@@ -111,6 +113,8 @@ class RestaurantViewModel(
             supplierDebts = useCases.supplierDebt.calculateSupplierDebts(snapshot),
             bankBalances = useCases.bankCards.calculateBalances(snapshot),
             accounting = useCases.accounting.summary(snapshot),
+            dailyAccounting = useCases.accounting.dailySummary(snapshot, com.restaurant.offlinemanager.core.utils.PersianDateFormatter.nowMillis()),
+            monthlyAccounting = useCases.accounting.summary(snapshot, com.restaurant.offlinemanager.core.utils.PersianDateFormatter.currentMonthKey()),
             projectProfits = useCases.accounting.projectProfits(snapshot),
             monthlyPoints = useCases.reports.monthlySummary(snapshot),
             cookingBatchCosts = useCases.inventory.cookingBatchCosts(snapshot)

@@ -53,9 +53,108 @@ import com.restaurant.offlinemanager.core.design.TextPrimary
 import com.restaurant.offlinemanager.core.design.TextSecondary
 import com.restaurant.offlinemanager.core.utils.MoneyFormatter
 import com.restaurant.offlinemanager.core.utils.NumberFormatter
+import com.restaurant.offlinemanager.core.utils.PersianDateFormatter
+import com.restaurant.offlinemanager.data.local.entity.DeliveryStatus
+import com.restaurant.offlinemanager.data.local.entity.billableQuantity
 import com.restaurant.offlinemanager.domain.model.MonthlyPoint
 import com.restaurant.offlinemanager.ui.AppUiState
 import com.restaurant.offlinemanager.ui.CsvReportType
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+
+@Composable
+fun PeriodReportScreen(
+    state: AppUiState,
+    monthly: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val today = LocalDate.now()
+    val monthKey = PersianDateFormatter.currentMonthKey()
+    fun inPeriod(timestamp: Long): Boolean = if (monthly) {
+        PersianDateFormatter.monthKey(timestamp) == monthKey
+    } else {
+        Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).toLocalDate() == today
+    }
+    val accounting = if (monthly) state.monthlyAccounting else state.dailyAccounting
+    val batches = state.snapshot.cookingBatches.filter { inPeriod(it.date) }
+    val deliveries = state.snapshot.mealDeliveries.filter { it.status == DeliveryStatus.DELIVERED && inPeriod(it.date) }
+    val purchases = state.snapshot.purchases.filter { inPeriod(it.date) }
+    val expenses = state.snapshot.expenses.filter { inPeriod(it.date) }
+    val produced = batches.sumOf { it.producedQuantity }
+    val delivered = deliveries.sumOf { it.billableQuantity }
+    val title = if (monthly) "گزارش ماه جاری" else "گزارش امروز"
+    val periodLabel = if (monthly) NumberFormatter.toPersianDigits(monthKey) else PersianDateFormatter.formatLong(PersianDateFormatter.nowMillis())
+
+    LazyColumn(
+        modifier = modifier.fillMaxSize().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item { SectionHeader(title) }
+        item {
+            GlassCard(Modifier.fillMaxWidth(), accent = Gold) {
+                Text(periodLabel, color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+                Text("خلاصه عملیات و حسابداری همین بازه", color = TextSecondary)
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatCard("غذای پخته‌شده", NumberFormatter.format(produced), Icons.Outlined.Inventory, AppCyan, Modifier.weight(1f), "پرس")
+                StatCard("غذای تحویل‌شده", NumberFormatter.format(delivered), Icons.Outlined.Business, AppGreen, Modifier.weight(1f), "پرس")
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatCard("درآمد تحویل", MoneyFormatter.format(accounting.earnedRevenue), Icons.Outlined.Payments, AppGreen, Modifier.weight(1f))
+                StatCard("بهای مواد مصرفی", MoneyFormatter.format(accounting.costOfGoodsConsumed), Icons.Outlined.Inventory, AppOrange, Modifier.weight(1f))
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatCard("دریافتی", MoneyFormatter.format(accounting.cashReceived), Icons.Outlined.Payments, AppPurple, Modifier.weight(1f))
+                StatCard("هزینه جاری", MoneyFormatter.format(accounting.operatingExpenses), Icons.Outlined.Warning, AppRed, Modifier.weight(1f))
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatCard("خرید", MoneyFormatter.format(purchases.sumOf { it.totalAmount }), Icons.Outlined.ShoppingCart, Gold, Modifier.weight(1f))
+                StatCard("ضایعات", MoneyFormatter.format(accounting.wasteLoss), Icons.Outlined.Warning, AppRed, Modifier.weight(1f))
+            }
+        }
+        item {
+            GlassCard(Modifier.fillMaxWidth(), accent = if (accounting.netProfit >= 0) AppGreen else AppRed) {
+                Text("نتیجه مالی", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.height(8.dp))
+                Row {
+                    Text("سود ناخالص", color = TextSecondary, modifier = Modifier.weight(1f))
+                    MoneyText(accounting.grossProfit)
+                }
+                Row {
+                    Text("سود خالص", color = TextSecondary, modifier = Modifier.weight(1f))
+                    MoneyText(accounting.netProfit, color = if (accounting.netProfit >= 0) AppGreen else AppRed)
+                }
+                Row {
+                    Text("جریان نقدی", color = TextSecondary, modifier = Modifier.weight(1f))
+                    MoneyText(accounting.netCashFlow, color = if (accounting.netCashFlow >= 0) AppCyan else AppRed)
+                }
+            }
+        }
+        if (batches.isEmpty() && deliveries.isEmpty() && purchases.isEmpty() && expenses.isEmpty()) {
+            item { com.restaurant.offlinemanager.core.design.EmptyState("داده‌ای در این بازه ثبت نشده", "پس از ثبت مصرف، تحویل، خرید یا هزینه، گزارش خودکار تکمیل می‌شود.") }
+        } else {
+            item { SectionHeader("تعداد عملیات") }
+            item {
+                ReportCard(
+                    title = "عملیات ثبت‌شده",
+                    subtitle = "${NumberFormatter.format(batches.size)} پخت • ${NumberFormatter.format(deliveries.size)} تحویل • ${NumberFormatter.format(purchases.size)} خرید • ${NumberFormatter.format(expenses.size)} هزینه",
+                    icon = Icons.Outlined.BarChart,
+                    accent = AppCyan
+                )
+            }
+        }
+        item { Spacer(Modifier.height(20.dp)) }
+    }
+}
 
 @Composable
 fun ReportsScreen(

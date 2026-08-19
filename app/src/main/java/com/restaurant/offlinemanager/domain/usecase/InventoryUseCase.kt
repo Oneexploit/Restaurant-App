@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlin.math.abs
 import kotlin.math.roundToLong
+import java.time.Instant
+import java.time.ZoneId
 
 class InventoryUseCase(private val repository: RestaurantRepository) {
     fun observeInventory(): Flow<List<InventoryItem>> =
@@ -50,6 +52,12 @@ class InventoryUseCase(private val repository: RestaurantRepository) {
         return (if (monthKey == null) valuation.wasteLoss else valuation.monthlyWaste[monthKey] ?: 0.0).roundToLong()
     }
 
+    fun costOfGoodsConsumedOnDate(snapshot: RestaurantSnapshot, timestamp: Long): Long =
+        (calculateValuation(snapshot).dailyConsumed[localDateKey(timestamp)] ?: 0.0).roundToLong()
+
+    fun wasteLossOnDate(snapshot: RestaurantSnapshot, timestamp: Long): Long =
+        (calculateValuation(snapshot).dailyWaste[localDateKey(timestamp)] ?: 0.0).roundToLong()
+
     fun projectMaterialCosts(snapshot: RestaurantSnapshot): Map<Long, Long> =
         calculateValuation(snapshot).projectCosts.mapValues { it.value.roundToLong() }
 
@@ -75,6 +83,8 @@ class InventoryUseCase(private val repository: RestaurantRepository) {
         var waste = 0.0
         val monthlyConsumed = mutableMapOf<String, Double>()
         val monthlyWaste = mutableMapOf<String, Double>()
+        val dailyConsumed = mutableMapOf<String, Double>()
+        val dailyWaste = mutableMapOf<String, Double>()
         val purchaseCosts = effectivePurchaseUnitCosts(snapshot)
         val fallbackPurchaseCosts = snapshot.purchaseItems
             .groupBy { it.materialId }
@@ -102,6 +112,8 @@ class InventoryUseCase(private val repository: RestaurantRepository) {
                         consumed += cost
                         val month = PersianDateFormatter.monthKey(transaction.date)
                         monthlyConsumed[month] = (monthlyConsumed[month] ?: 0.0) + cost
+                        val day = localDateKey(transaction.date)
+                        dailyConsumed[day] = (dailyConsumed[day] ?: 0.0) + cost
                         transaction.projectId?.let { projectId ->
                             projectCosts[projectId] = (projectCosts[projectId] ?: 0.0) + cost
                         }
@@ -119,6 +131,8 @@ class InventoryUseCase(private val repository: RestaurantRepository) {
                         waste += cost
                         val month = PersianDateFormatter.monthKey(transaction.date)
                         monthlyWaste[month] = (monthlyWaste[month] ?: 0.0) + cost
+                        val day = localDateKey(transaction.date)
+                        dailyWaste[day] = (dailyWaste[day] ?: 0.0) + cost
                     }
                     StockTransactionType.ADJUSTMENT -> {
                         if (transaction.quantity > 0) {
@@ -137,7 +151,7 @@ class InventoryUseCase(private val repository: RestaurantRepository) {
                 projectCosts[allocation.projectId] = (projectCosts[allocation.projectId] ?: 0.0) + allocatedCost
             }
         }
-        return ValuationResult(balances, projectCosts, batchCosts, consumed, waste, monthlyConsumed, monthlyWaste)
+        return ValuationResult(balances, projectCosts, batchCosts, consumed, waste, monthlyConsumed, monthlyWaste, dailyConsumed, dailyWaste)
     }
 
     private fun effectivePurchaseUnitCosts(snapshot: RestaurantSnapshot): Map<Pair<Long?, Long>, Double> {
@@ -184,10 +198,15 @@ class InventoryUseCase(private val repository: RestaurantRepository) {
         val costOfGoodsConsumed: Double,
         val wasteLoss: Double,
         val monthlyConsumed: Map<String, Double>,
-        val monthlyWaste: Map<String, Double>
+        val monthlyWaste: Map<String, Double>,
+        val dailyConsumed: Map<String, Double>,
+        val dailyWaste: Map<String, Double>
     )
 
     private fun Double.cleanZero(): Double = if (abs(this) < EPSILON) 0.0 else this
+
+    private fun localDateKey(timestamp: Long): String =
+        Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).toLocalDate().toString()
 
     private companion object { const val EPSILON = 0.000001 }
 }

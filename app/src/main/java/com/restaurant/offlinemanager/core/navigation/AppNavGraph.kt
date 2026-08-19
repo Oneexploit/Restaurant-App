@@ -45,6 +45,7 @@ import com.restaurant.offlinemanager.ui.purchases.PurchaseFormScreen
 import com.restaurant.offlinemanager.ui.purchases.PurchasesListScreen
 import com.restaurant.offlinemanager.ui.purchases.SupplierFormScreen
 import com.restaurant.offlinemanager.ui.reports.ReportsScreen
+import com.restaurant.offlinemanager.ui.reports.PeriodReportScreen
 import com.restaurant.offlinemanager.ui.search.SearchScreen
 import com.restaurant.offlinemanager.ui.settings.SettingsScreen
 import com.restaurant.offlinemanager.ui.warehouse.MaterialFormScreen
@@ -67,7 +68,7 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
     val motionEnabled = !state.settings.reducedMotionEnabled
     fun navigateBackInsideApp() {
         if (!navController.popBackStack()) {
-            navController.navigate(Routes.Home) {
+            navController.navigate(Routes.ProjectsList) {
                 launchSingleTop = true
             }
         }
@@ -97,7 +98,7 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
         bottomDestinations = BottomDestinations,
         onNavigate = { route ->
             navController.navigate(route) {
-                popUpTo(Routes.Home) { saveState = true }
+                popUpTo(Routes.ProjectsList) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
             }
@@ -111,7 +112,7 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
         ) { padding ->
             NavHost(
             navController = navController,
-            startDestination = Routes.Home,
+            startDestination = Routes.ProjectsList,
             modifier = Modifier.padding(padding),
             enterTransition = {
                 if (motionEnabled) fadeIn(tween(220)) + slideInHorizontally(tween(320)) { it / 6 } else EnterTransition.None
@@ -370,6 +371,12 @@ fun AppNavGraph(viewModel: RestaurantViewModel) {
             composable(Routes.Reports) {
                 ReportsScreen(state, context, onExport = viewModel::exportCsv)
             }
+            composable(Routes.DailyReport) {
+                PeriodReportScreen(state = state, monthly = false)
+            }
+            composable(Routes.MonthlyReport) {
+                PeriodReportScreen(state = state, monthly = true)
+            }
             composable(Routes.GlobalSearch) {
                 SearchScreen(
                     state,
@@ -409,12 +416,15 @@ private fun bottomRouteFor(route: String?): String? =
     when {
         route == null -> null
         route.startsWith(Routes.Home) -> Routes.Home
-        route.startsWith(Routes.ProjectsList) || route.startsWith(Routes.ProjectDetails) || route.startsWith(Routes.AddEditProject) || route.startsWith(Routes.MealDeliveryList) || route.startsWith(Routes.AddEditMealDelivery) -> Routes.ProjectsList
+        route.startsWith(Routes.MealDeliveryList) || route.startsWith(Routes.AddEditMealDelivery) -> Routes.MealDeliveryList
+        route.startsWith(Routes.ProjectsList) || route.startsWith(Routes.ProjectDetails) || route.startsWith(Routes.AddEditProject) -> Routes.ProjectsList
         route.startsWith(Routes.WarehousesList) || route.startsWith(Routes.AddStockIn) || route.startsWith(Routes.AddStockOut) || route.startsWith(Routes.TransferStock) || route.startsWith(Routes.AddStockWaste) || route.startsWith(Routes.AddStockAdjustment) || route.startsWith(Routes.AddEditWarehouse) || route.startsWith(Routes.AddEditMaterial) -> Routes.WarehousesList
         route.startsWith(Routes.CookingList) || route.startsWith(Routes.AddEditCooking) -> Routes.CookingList
         route.startsWith(Routes.FinanceDashboard) || route.startsWith(Routes.AddProjectPayment) || route.startsWith(Routes.AddSupplierPayment) || route.startsWith(Routes.AddEditBankCard) || route.startsWith(Routes.AddExpense) -> Routes.FinanceDashboard
         route.startsWith(Routes.PurchasesList) || route.startsWith(Routes.AddEditPurchase) || route.startsWith(Routes.AddSupplier) -> Routes.PurchasesList
         route.startsWith(Routes.Reports) -> Routes.Reports
+        route.startsWith(Routes.DailyReport) -> Routes.DailyReport
+        route.startsWith(Routes.MonthlyReport) -> Routes.MonthlyReport
         else -> null
     }
 
@@ -443,6 +453,8 @@ private fun titleFor(route: String?): String =
         route.startsWith(Routes.PurchasesList) || route.startsWith(Routes.AddEditPurchase) -> "خرید روزانه"
         route.startsWith(Routes.AddSupplier) -> "تامین‌کننده"
         route.startsWith(Routes.Reports) -> "گزارش‌ها"
+        route.startsWith(Routes.DailyReport) -> "گزارش روزانه"
+        route.startsWith(Routes.MonthlyReport) -> "گزارش ماهانه"
         route.startsWith(Routes.GlobalSearch) -> "جستجو"
         route.startsWith(Routes.Settings) -> "تنظیمات"
         else -> "مدیریت غذای شرکتی"

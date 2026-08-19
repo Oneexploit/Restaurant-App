@@ -2,10 +2,10 @@ package com.restaurant.offlinemanager.core.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.List
-import androidx.compose.material.icons.outlined.AccountBalanceWallet
-import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Inventory
-import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.RestaurantMenu
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -35,6 +35,8 @@ object Routes {
     const val AddSupplierPayment = "addSupplierPayment"
     const val AddExpense = "addExpense"
     const val Reports = "reports"
+    const val DailyReport = "dailyReport"
+    const val MonthlyReport = "monthlyReport"
     const val GlobalSearch = "search"
     const val Settings = "settings"
 }
@@ -46,10 +48,10 @@ data class BottomDestination(
 )
 
 val BottomDestinations = listOf(
-    BottomDestination(Routes.Home, "خانه", Icons.Outlined.Home),
-    BottomDestination(Routes.ProjectsList, "شرکت‌ها", Icons.AutoMirrored.Outlined.List),
+    BottomDestination(Routes.ProjectsList, "پروژه", Icons.AutoMirrored.Outlined.List),
     BottomDestination(Routes.WarehousesList, "انبار", Icons.Outlined.Inventory),
-    BottomDestination(Routes.PurchasesList, "خرید", Icons.Outlined.ShoppingCart),
     BottomDestination(Routes.CookingList, "مصرف", Icons.Outlined.RestaurantMenu),
-    BottomDestination(Routes.FinanceDashboard, "مالی", Icons.Outlined.AccountBalanceWallet),
+    BottomDestination(Routes.MealDeliveryList, "تحویل غذا", Icons.Outlined.Restaurant),
+    BottomDestination(Routes.DailyReport, "گزارش روزانه", Icons.Outlined.CalendarToday),
+    BottomDestination(Routes.MonthlyReport, "ماهانه", Icons.Outlined.DateRange)
 )

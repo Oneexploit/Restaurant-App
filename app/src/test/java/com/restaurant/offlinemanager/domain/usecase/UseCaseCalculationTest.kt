@@ -284,6 +284,46 @@ class UseCaseCalculationTest {
     }
 
     @Test
+    fun dailyAccountingIncludesOnlyTransactionsFromRequestedDay() {
+        val today = com.restaurant.offlinemanager.core.utils.PersianDateFormatter.todayStartMillis()
+        val yesterday = com.restaurant.offlinemanager.core.utils.PersianDateFormatter.shiftDays(today, -1)
+        val warehouse = warehouse()
+        val material = material()
+        val project = project()
+        val stockIn = stock(warehouse.id, material.id, StockTransactionType.IN, 10.0)
+            .copy(id = 1, unitPrice = 100, date = yesterday, createdAt = yesterday)
+        val consumedToday = stock(warehouse.id, material.id, StockTransactionType.OUT, 2.0)
+            .copy(id = 2, date = today, createdAt = today)
+        val snapshot = RestaurantSnapshot(
+            projects = listOf(project),
+            warehouses = listOf(warehouse),
+            materials = listOf(material),
+            mealDeliveries = listOf(
+                meal(project.id, 1_000).copy(id = 1, date = today),
+                meal(project.id, 9_000).copy(id = 2, date = yesterday)
+            ),
+            projectPayments = listOf(
+                projectPayment(project.id, 700).copy(id = 1, date = today),
+                projectPayment(project.id, 4_000).copy(id = 2, date = yesterday)
+            ),
+            expenses = listOf(
+                expense(amount = 50, cardId = 1).copy(id = 1, date = today),
+                expense(amount = 500, cardId = 1).copy(id = 2, date = yesterday)
+            ),
+            stockTransactions = listOf(stockIn, consumedToday)
+        )
+
+        val summary = AccountingUseCase(InventoryUseCase(FakeRepository(snapshot)))
+            .dailySummary(snapshot, today)
+
+        assertEquals(1_000, summary.earnedRevenue)
+        assertEquals(700, summary.cashReceived)
+        assertEquals(200, summary.costOfGoodsConsumed)
+        assertEquals(750, summary.netProfit)
+        assertEquals(650, summary.netCashFlow)
+    }
+
+    @Test
     fun dashboardUsesCurrentJalaliMonthForMonthlyTotals() {
         val today = com.restaurant.offlinemanager.core.utils.PersianDateFormatter.todayStartMillis()
         val older = com.restaurant.offlinemanager.core.utils.PersianDateFormatter.shiftDays(today, -45)

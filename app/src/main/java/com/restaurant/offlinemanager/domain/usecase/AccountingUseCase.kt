@@ -6,8 +6,28 @@ import com.restaurant.offlinemanager.data.local.entity.DeliveryStatus
 import com.restaurant.offlinemanager.domain.model.AccountingSummary
 import com.restaurant.offlinemanager.domain.model.ProjectProfit
 import com.restaurant.offlinemanager.domain.model.RestaurantSnapshot
+import java.time.Instant
+import java.time.ZoneId
 
 class AccountingUseCase(private val inventoryUseCase: InventoryUseCase) {
+    fun dailySummary(snapshot: RestaurantSnapshot, timestamp: Long): AccountingSummary {
+        val targetDate = Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
+        fun inDay(value: Long) = Instant.ofEpochMilli(value).atZone(ZoneId.systemDefault()).toLocalDate() == targetDate
+        val earnedRevenue = snapshot.mealDeliveries.filter { it.status == DeliveryStatus.DELIVERED && inDay(it.date) }.sumOf { it.totalAmount }
+        val cashReceived = snapshot.projectPayments.filter { inDay(it.date) }.sumOf { it.amount }
+        val paidPurchases = snapshot.purchases.filter { inDay(it.date) && it.paymentType != PurchasePaymentType.CREDIT }.sumOf { it.paidAmount }
+        val supplierPayments = snapshot.supplierPayments.filter { inDay(it.date) }.sumOf { it.amount }
+        val expenses = snapshot.expenses.filter { inDay(it.date) }.sumOf { it.amount }
+        val costOfGoods = inventoryUseCase.costOfGoodsConsumedOnDate(snapshot, timestamp)
+        val waste = inventoryUseCase.wasteLossOnDate(snapshot, timestamp)
+        val grossProfit = earnedRevenue - costOfGoods
+        return AccountingSummary(
+            earnedRevenue, cashReceived, paidPurchases, supplierPayments, expenses,
+            costOfGoods, waste, grossProfit, grossProfit - expenses - waste,
+            cashReceived - paidPurchases - supplierPayments - expenses
+        )
+    }
+
     fun summary(snapshot: RestaurantSnapshot, monthKey: String? = null): AccountingSummary {
         fun inPeriod(timestamp: Long): Boolean = monthKey == null || PersianDateFormatter.monthKey(timestamp) == monthKey
         val earnedRevenue = snapshot.mealDeliveries
